@@ -3,6 +3,7 @@
     Properties
     {
         [HDR] _Color("Main Color", Color) = (1,1,1,1)
+        _MinAlpha("Main Color", Range (0.1, 1)) = 0.1
         _FresnelBias("Fresnel Bias", Float) = 0
         _FresnelScale("Fresnel Scale", Float) = 1
         _FresnelPower("Fresnel Power", Float) = 1
@@ -42,7 +43,7 @@
             fixed _FresnelBias;
             fixed _FresnelScale;
             fixed _FresnelPower;
-
+            fixed _MinAlpha;
             v2f vert(appdata_t v)
             {
                 v2f o;
@@ -55,7 +56,7 @@
 
             fixed4 frag(v2f i) : SV_Target
             {
-                return lerp(fixed4(0.0,0.0,0.0,0.0), _Color, saturate(1 - i.fresnel));
+                return lerp(fixed4(0.0,0.0,0.0,0.0), _Color, clamp(1 - i.fresnel,_MinAlpha,1));
             }
 
             ENDCG

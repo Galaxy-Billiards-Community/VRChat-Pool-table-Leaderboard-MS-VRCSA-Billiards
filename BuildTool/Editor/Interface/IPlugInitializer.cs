@@ -6,7 +6,7 @@ namespace WangQAQ.PoolBuild
 {
 	public interface IPlugInitializer
 	{
-		/* 检查绑定的脚本是否有效 */
-		public bool Init();
+		/* 妫�鏌ョ粦瀹氱殑鑴氭湰鏄惁鏈夋晥 */
+		public bool Init(string worldGuid,string worldKey);
 	}
 }

@@ -17,14 +17,23 @@ public class IScoreAPI : UdonSharpBehaviour
 	//API lobbyPlayerList
 	public virtual void _LobbyOpen(string[] lobbyPlayerList) { /* Nop */  }
 
+	//API lobbyPlayerList_ByID
+	public virtual void _LobbyOpen_ID(int[] lobbyPlayerIDs) { /* Nop */  }
+
 	//API nowPlayerList
 	public virtual void _PlayerChanged(string[] nowPlayerList, int gameState) { /* Nop */  }
+
+	//API nowPlayerList_ByID
+	public virtual void _PlayerChanged_ID(int[] nowPlayerIDs) { /* Nop */  }
 
 	//API startPlayerList
 	public virtual void _GameStarted(string[] startPlayerList) { /* Nop */  }
 
 	//API winningTeamLocal
 	public virtual void _GameEnd(uint winningTeamLocal) { /* Nop */  }
+
+	//API winningTeamLocal_WithID
+	public virtual void _GameEnd_WithID(uint winningTeamLocal, int[] playerID) { /* Nop */  }
 
 	/* 刷新计分器 */
 	public virtual void _GameReset() { /* Nop */ }

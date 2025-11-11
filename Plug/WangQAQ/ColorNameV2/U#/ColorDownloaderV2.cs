@@ -4,17 +4,12 @@
  *
  *	第二版彩色名称下载
  */
-using System.Text;
-using System;
 using UdonSharp;
 using UnityEngine;
-using UnityEngine.InputSystem;
 using VRC.SDK3.Data;
 using VRC.SDK3.StringLoading;
 using VRC.SDKBase;
-using VRC.Udon;
 using VRC.Udon.Common.Interfaces;
-using WangQAQ.ED;
 
 namespace WangQAQ.UdonPlug
 {

@@ -8,12 +8,12 @@ namespace WangQAQ.PoolBuild
 {
 	public class EloDownloadBinder : IPlugInitializer
 	{
-		public bool Init()
+		public bool Init(string worldGuid, string worldKey)
 		{
 			var _eloDownloadObject = Component.FindObjectOfType<EloDownload>();
 			var _leaderboardObjects = Component.FindObjectsOfType<LeaderboardV2>();
 
-			if(_eloDownloadObject == null || _leaderboardObjects == null)
+			if (_eloDownloadObject == null || _leaderboardObjects == null)
 				return false;
 
 			_eloDownloadObject._leaderboards = _leaderboardObjects;

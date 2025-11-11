@@ -3,7 +3,6 @@ using UnityEngine;
 using VRC.SDK3.StringLoading;
 using VRC.SDKBase;
 using VRC.Udon.Common.Interfaces;
-using WangQAQ.ED;
 using UnityEngine.UI;
 
 namespace WangQAQ.UdonPlug
@@ -14,7 +13,6 @@ namespace WangQAQ.UdonPlug
 
 		[SerializeField] public VRCUrl[] urls;
 		[HideInInspector] public byte[] key = null;
-		[HideInInspector] public HC256 _hc256;
 
 		[HideInInspector] public uint _UrlID = 0;
 

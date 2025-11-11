@@ -9,7 +9,6 @@ using VRC.SDK3.Data;
 using VRC.SDK3.StringLoading;
 using VRC.SDKBase;
 using VRC.Udon.Common.Interfaces;
-using WangQAQ.ED;
 
 public class MagnificationDownload : UdonSharpBehaviour
 {

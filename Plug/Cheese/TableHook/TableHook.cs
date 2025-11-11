@@ -7,42 +7,84 @@ using VRC.SDKBase;
 using TMPro;
 using VRC.SDK3.Data;
 using Unity.Mathematics;
+using VRC.SDK3.Components;
+using VRC.SDK3.Persistence;
 
 public class TableHook : UdonSharpBehaviour
 {
-    //Data
-    [SerializeField] public Texture2D[] cueSkins;
-    [SerializeField] public TextMeshProUGUI PlayerID;
-    [HideInInspector] public float TableColor;
-    [HideInInspector] public float TableColorLightness;
-    [HideInInspector] public float cueHue;
+	[Header("设置")]
+	//Data
+	[SerializeField] public Texture2D[] cueSkins;
+    //[SerializeField] public TextMeshProUGUI PlayerID;
+    [NonSerialized] public float TableColor;
+    [NonSerialized] public float TableColorLightness;
+    [NonSerialized] public float cueHue;
 
-    // Cue Skin & Ball Skin
-    [HideInInspector] public int inOwner;
-    [HideInInspector] public byte outCanUse;
+    [NonSerialized] public bool CueTrajectory = false;
+	[NonSerialized] public bool OtherTrajectory = false;
+
+	[NonSerialized] public bool TargetBallHint = true;
+
+	// Cue Skin & Ball Skin
+	[NonSerialized] public int inOwner;
+    [NonSerialized] public byte outCanUse;
     private byte outCanUseTmp = 0;
-    [HideInInspector] public byte ball;
+    [NonSerialized] public byte ball;
     public byte DefaultCue;
     private int isRotating;
-    [NonSerialized] private int maxRotation=130;
+    [NonSerialized] private int maxRotation=180;
 
-    private Renderer renderer;
-    private Material cueStickMaterial;
-    private Material cueCentermaterial;
-    //Save & Load
-    public TMP_InputField inputField;
-    //public InputField inputField;
-    [SerializeField] public SettingLoader SettingLoader;
+    [Space(10)]
+    [Header("插件")]
+	//Save & Load
+    [SerializeField] private SettingManager _settingManager;
+    [SerializeField] private Translations hookTranslation;
 
-    public Translations hookTranslation;
-    private DataList table = new DataList();
-    private DataList Translations = new DataList();
+	[Space(10)]
+	[Header("UI")]
 
-    void OnEnable()
+	[SerializeField] private InputField inputField;
+    [SerializeField] private VRCUrlInputField urlField;
+
+	[SerializeField] private Slider tableColorSlider;
+	[SerializeField] private Slider tableColorLightnessSlider;
+	[SerializeField] private Material tableShow;
+
+	[SerializeField] private Slider cueSizeSlider;
+	[SerializeField] private TextMeshProUGUI cueSizeText;
+
+	[SerializeField] private Slider cueThicknessSlider;
+	[SerializeField] private TextMeshProUGUI cueThicknessText;
+
+	[SerializeField] private Slider cueSmoothingSlider;
+	[SerializeField] private TextMeshProUGUI cueSmoothingText;
+
+	[SerializeField] private Slider cueColorShiftSlider;
+	[SerializeField] private TextMeshProUGUI cueColorShiftText;
+
+	[SerializeField] private Renderer renderer;
+
+    [SerializeField] private InputField codeInput = null;
+
+	[SerializeField] private Toggle cueTrajectoryToggle;
+	[SerializeField] private Toggle otherTrajectoryToggle;
+
+	[SerializeField] private Toggle targetBallHintToggle;
+
+	public float cueThicknessValue => cueThicknessSlider.value;
+
+	private DataList table = new DataList();
+    private DataList _translations = new DataList();
+
+	private Material cueStickMaterial;
+	private Material cueCentermaterial;
+
+	public void OnEnable()
     {
-        Translations.Add(hookTranslation);
+        _settingManager._Init(this);
+		_translations.Add(hookTranslation);
 
-        PlayerID.text = Networking.LocalPlayer.displayName;
+        //PlayerID.text = Networking.LocalPlayer.displayName;
 
         cueHue = 0;
         outCanUse = 0;
@@ -54,7 +96,6 @@ public class TableHook : UdonSharpBehaviour
         TableColorLightness = 1
             ;
         //CUE
-        renderer = this.transform.Find("body/render").GetComponent<Renderer>();
         Material[] materials = renderer.materials;
         cueCentermaterial=materials[0];
         cueStickMaterial = materials[1];
@@ -92,10 +133,6 @@ public class TableHook : UdonSharpBehaviour
             outCanUse = outCanUseTmp;
     }
 
-    //public void _ChangeKeepRotating()
-    //{ 
-    //    keepCueRotating = !keepCueRotating;
-    //}
     private void ChangeMaterial()
     {
         if (cueSkins[outCanUseTmp] != null)
@@ -114,16 +151,14 @@ public class TableHook : UdonSharpBehaviour
     }
     public void AddTranslation(Translations translations)
     {
-        Translations.Add(translations);
+        _translations.Add(translations);
     }
+
     public void AddBilliardsModule(BilliardsModule module)
     {
         table.Add(module);
     }
 
-    public Slider tableColorSlider;
-    public Slider tableColorLightnessSlider;
-    public Material tableShow;
     public void setTableColor()
     {
         TableColor = tableColorSlider.value;
@@ -135,24 +170,23 @@ public class TableHook : UdonSharpBehaviour
         tableShow.SetFloat("_ClothSaturation", TableColorLightness);
     }
 
-    public Slider cueSizeSlider;
-    public TextMeshProUGUI cueSizeText;
-    public void setCueSize()
-    {
-        float newScale = cueSizeSlider.value / 10f;
-        renderer.transform.localScale = new Vector3(0.3f * newScale,0.3f * newScale,newScale * 0.3f);
-        foreach (var tabletmp in table.ToArray())
-        {
-            ((BilliardsModule)tabletmp.Reference).cueControllers[0].setScale(newScale);
-            ((BilliardsModule)tabletmp.Reference).cueControllers[1].setScale(newScale);
-            ((BilliardsModule)tabletmp.Reference).menuManager.cueSizeSlider.value = cueSizeSlider.value;
-            ((BilliardsModule)tabletmp.Reference).menuManager.cueSizeText.text = newScale.ToString("F1");
-        }
-        cueSizeText.text = newScale.ToString("F1");
-    }
-    public Slider cueSmoothingSlider;
-    public TextMeshProUGUI cueSmoothingText;
-    public void setCueSmoothing()
+	public void setCueSize()
+	{
+		float newScale = cueSizeSlider.value / 10f;
+		float newThickness = cueThicknessSlider.value / 10f;
+		renderer.transform.localScale = new Vector3(0.3f * newScale, 0.3f * newThickness, newThickness * 0.3f);
+		foreach (var tabletmp in table.ToArray())
+		{
+			((BilliardsModule)tabletmp.Reference).cueControllers[0].setScale(newScale, newThickness);
+			((BilliardsModule)tabletmp.Reference).cueControllers[1].setScale(newScale, newThickness);
+			((BilliardsModule)tabletmp.Reference).menuManager.cueSizeSlider.value = cueSizeSlider.value;
+			((BilliardsModule)tabletmp.Reference).menuManager.cueSizeText.text = newScale.ToString("F1");
+		}
+		cueSizeText.text = newScale.ToString("F1");
+		cueThicknessText.text = newThickness.ToString("F1");
+	}
+
+	public void setCueSmoothing()
     {
         float newSmoothing = cueSmoothingSlider.value / 10f;
         foreach (var tabletmp in table.ToArray())
@@ -165,8 +199,6 @@ public class TableHook : UdonSharpBehaviour
         cueSmoothingText.text = newSmoothing.ToString("F1");
     }
 
-    public Slider cueColorShiftSlider;
-    public TextMeshProUGUI cueColorShiftText;
     public void setCueColorShift()
     {
         float newShift = cueColorShiftSlider.value;
@@ -179,13 +211,24 @@ public class TableHook : UdonSharpBehaviour
 
         renderer.materials[1].color = color;
 
-
         cueColorShiftText.text = newShift.ToString("F1");
 
     }
-    //Sava and load system
-    #region ConvertFunction
-    private void floatToBytes(byte[] data, int pos, float v)
+
+    public void setTrajectory()
+    {
+        CueTrajectory = cueTrajectoryToggle.isOn;
+        OtherTrajectory = otherTrajectoryToggle.isOn;
+	}
+
+    public void setTargetBallHint()
+    {
+		TargetBallHint = targetBallHintToggle.isOn;
+	}
+
+	//Sava and load system
+	#region ConvertFunction
+	private void floatToBytes(byte[] data, int pos, float v)
     {
         byte[] bytes = BitConverter.GetBytes(v);
         Array.Copy(bytes, 0, data, pos, 4);
@@ -198,7 +241,36 @@ public class TableHook : UdonSharpBehaviour
         return BitConverter.ToSingle(floatBytes, 0);
     }
 
-    private bool isInvalidBase64Char(char value)
+	private void bool16ToBytes(byte[] data, int pos, bool[] values)
+	{
+		if (values.Length != 16)
+			return;
+
+		for (int i = 0; i < 2; i++)
+			data[pos + i] = 0;
+
+		for (int i = 0; i < 16; i++)
+		{
+			if (values[i])
+			{
+				data[pos + i / 8] |= (byte)(1 << (i % 8));
+			}
+		}
+	}
+
+	private bool[] bytesToBool16(byte[] data, int pos)
+	{
+		bool[] result = new bool[16];
+
+		for (int i = 0; i < 16; i++)
+		{
+			result[i] = (data[pos + i / 8] & (1 << (i % 8))) != 0;
+		}
+
+		return result;
+	}
+
+	private bool isInvalidBase64Char(char value)
     {
         var intValue = (int)value;
 
@@ -237,41 +309,53 @@ public class TableHook : UdonSharpBehaviour
 
         return true;
     }
-    #endregion
+	#endregion
 
-    #region Save & Load
-    // I Call it : Cheese Version ,for short CV,rewrite from "NetworingManagers" 
-    uint LocalDataLength = 23;
-    private string EncodeLocalData()
-    {
-        byte[] gameState = new byte[LocalDataLength];
-        int encodePos = 0;
-        gameState[encodePos] = outCanUseTmp;
-        encodePos += 1;
-        gameState[encodePos] = ball;
-        encodePos += 1;
-        floatToBytes(gameState, encodePos,TableColor);
-        encodePos += 4;
-        floatToBytes(gameState, encodePos, TableColorLightness);
-        encodePos += 4;
+	#region Save & Load
+	// I Call it : Cheese Version ,for short CV,rewrite from "NetworingManagers" 
+	uint LocalDataLengthV1 = 23;
+	uint LocalDataLengthV2 = 27;
+	uint LocalDataLengthV3 = 29;
+	private string EncodeLocalData()
+	{
+		byte[] gameState = new byte[LocalDataLengthV3];
+		int encodePos = 0;
+		gameState[encodePos] = outCanUseTmp;
+		encodePos += 1;
+		gameState[encodePos] = ball;
+		encodePos += 1;
+		floatToBytes(gameState, encodePos, TableColor);
+		encodePos += 4;
+		floatToBytes(gameState, encodePos, TableColorLightness);
+		encodePos += 4;
 
-        //CV1
-        floatToBytes(gameState, encodePos, cueSizeSlider.value);
-        encodePos += 4;
-        floatToBytes(gameState,encodePos,cueSmoothingSlider.value);
-        encodePos += 4;
-        floatToBytes(gameState, encodePos, cueHue);
-        encodePos += 4;
+		// CV1
+		floatToBytes(gameState, encodePos, cueSizeSlider.value);
+		encodePos += 4;
+		floatToBytes(gameState, encodePos, cueSmoothingSlider.value);
+		encodePos += 4;
+		floatToBytes(gameState, encodePos, cueHue);
+		encodePos += 4;
 
-        // find gameStateLength
-        //Debug.Log("gameStateLength = " + (encodePos + 1));
-        
-        return "CV1:"+Convert.ToBase64String(gameState);
+		// CV2
+		floatToBytes(gameState, encodePos, cueThicknessSlider.value);
+		encodePos += 4;
 
-        //Debug.Log("CV:" + Convert.ToBase64String(gameState));
-    }
+		// CV3 开关状态
+		bool[] toggleState = new bool[16];
 
-    private void LoadLocalDataV0(string gameStateStr)
+        // 轨迹
+        toggleState[0] = CueTrajectory; 
+        toggleState[1] = OtherTrajectory;
+        toggleState[2] = TargetBallHint;
+
+		bool16ToBytes(gameState, encodePos, toggleState);
+		encodePos += 2;
+
+		return "CV3:" + Convert.ToBase64String(gameState);
+	}
+
+	private void LoadLocalDataV0(string gameStateStr)
     {
         if (!isValidBase64(gameStateStr)) return;
 
@@ -290,12 +374,12 @@ public class TableHook : UdonSharpBehaviour
 
         ChangeMaterial();
     }
-    private void LoadLocalDataV1(string gameStateStr)
+	private void LoadLocalDataV1(string gameStateStr)
     {
         if (!isValidBase64(gameStateStr)) return;
 
         byte[] gameState = Convert.FromBase64String(gameStateStr);
-        if (gameState.Length != LocalDataLength) return;
+        if (gameState.Length != LocalDataLengthV1) return;
 
         int encoodePos = 0;
 
@@ -327,9 +411,112 @@ public class TableHook : UdonSharpBehaviour
 
         ChangeMaterial();
     }
-    private void LoadLocalData(string gameStateStr)
+	private void LoadLocalDataV2(string gameStateStr)
+	{
+		if (!isValidBase64(gameStateStr)) return;
+
+		byte[] gameState = Convert.FromBase64String(gameStateStr);
+		if (gameState.Length != LocalDataLengthV2) return;
+
+		int encoodePos = 0;
+
+		outCanUseTmp = gameState[encoodePos];
+		encoodePos += 1;
+		ball = gameState[encoodePos];
+		encoodePos += 1;
+		TableColor = bytesToFloat(gameState, encoodePos);
+		encoodePos += 4;
+		TableColorLightness = bytesToFloat(gameState, encoodePos);
+		encoodePos += 4;
+		tableColorSlider.value = TableColor;
+		tableColorLightnessSlider.value = TableColorLightness;
+		tableShow.SetFloat("_ClothHue", TableColor);
+		tableShow.SetFloat("_ClothSaturation", TableColorLightness);
+
+		//dif
+		cueSizeSlider.value = bytesToFloat(gameState, encoodePos);
+		encoodePos += 4;
+		cueSmoothingSlider.value = bytesToFloat(gameState, encoodePos);
+		encoodePos += 4;
+		cueHue = bytesToFloat(gameState, encoodePos);
+		cueColorShiftSlider.value = cueHue;
+		encoodePos += 4;
+
+		//dif2
+		cueThicknessSlider.value = bytesToFloat(gameState, encoodePos);
+		encoodePos += 4;
+
+		setCueSize();
+		setCueSmoothing();
+		setCueColorShift();
+
+		ChangeMaterial();
+	}
+	private void LoadLocalDataV3(string gameStateStr)
+	{
+		if (!isValidBase64(gameStateStr)) return;
+
+		byte[] gameState = Convert.FromBase64String(gameStateStr);
+		if (gameState.Length != LocalDataLengthV3) return;
+
+		int encoodePos = 0;
+
+		outCanUseTmp = gameState[encoodePos];
+		encoodePos += 1;
+		ball = gameState[encoodePos];
+		encoodePos += 1;
+		TableColor = bytesToFloat(gameState, encoodePos);
+		encoodePos += 4;
+		TableColorLightness = bytesToFloat(gameState, encoodePos);
+		encoodePos += 4;
+		tableColorSlider.value = TableColor;
+		tableColorLightnessSlider.value = TableColorLightness;
+		tableShow.SetFloat("_ClothHue", TableColor);
+		tableShow.SetFloat("_ClothSaturation", TableColorLightness);
+
+		//dif
+		cueSizeSlider.value = bytesToFloat(gameState, encoodePos);
+		encoodePos += 4;
+		cueSmoothingSlider.value = bytesToFloat(gameState, encoodePos);
+		encoodePos += 4;
+		cueHue = bytesToFloat(gameState, encoodePos);
+		cueColorShiftSlider.value = cueHue;
+		encoodePos += 4;
+
+		//dif2
+		cueThicknessSlider.value = bytesToFloat(gameState, encoodePos);
+		encoodePos += 4;
+
+		// CV3 开关状态
+		bool[] toggleState = bytesToBool16(gameState, encoodePos);
+		encoodePos += 2;
+
+		// 轨迹
+		cueTrajectoryToggle.isOn = toggleState[0];
+		otherTrajectoryToggle.isOn = toggleState[1];
+
+		targetBallHintToggle.isOn = !toggleState[2];
+
+		setCueSize();
+		setCueSmoothing();
+		setCueColorShift();
+        setTrajectory();
+        setTargetBallHint();
+
+		ChangeMaterial();
+	}
+
+	private void LoadLocalData(string gameStateStr)
     {
-        if(gameStateStr.StartsWith("CV1:"))
+		if (gameStateStr.StartsWith("CV3:"))
+		{
+			LoadLocalDataV3(gameStateStr.Substring(4));
+		}
+		else if (gameStateStr.StartsWith("CV2:"))
+		{
+			LoadLocalDataV2(gameStateStr.Substring(4));
+		}
+		else if (gameStateStr.StartsWith("CV1:"))
         {
             LoadLocalDataV1(gameStateStr.Substring(4));
         }
@@ -338,7 +525,8 @@ public class TableHook : UdonSharpBehaviour
             LoadLocalDataV0(gameStateStr.Substring(3));
         }
     }
-    public void OnSaveButtonPushed()
+    /*
+    public void OnGenerateUrlButtonPushed()
     {
         if (ReferenceEquals(null, inputField))
         {
@@ -346,38 +534,50 @@ public class TableHook : UdonSharpBehaviour
             return;
         }
 
-        inputField.text = EncodeLocalData();
+        var playerName = Networking.LocalPlayer.displayName;
+        inputField.text = _settingManager._GenerateUrl(playerName, EncodeLocalData());
+    }
+    */
+
+    public void LoadFromNetwork(string setting)
+    {
+        LoadLocalData(setting);
     }
 
-    public void OnLoadButtonPushed()
+	public void OnSaveButtonPushed()
     {
-
-        if (ReferenceEquals(null, inputField))
+        if(codeInput == null)
         {
-            Debug.Log("Table Hook::OnSaveButtonPushed() inputField property is not set !");
             return;
         }
 
-        if (string.IsNullOrEmpty(inputField.text))
-        {
-            return;
-        }
-
-        //if (!_IsPlayer(Networking.LocalPlayer)) return; //not load on others game
-
-        LoadLocalData(inputField.text);
-
+        codeInput.text = EncodeLocalData();
     }
 
-    public void LoadFromNetwork()
+	public void OnLoadButtonPushed()
     {
-        inputField.text = SettingLoader.GetSettingString(Networking.LocalPlayer.displayName);
-        LoadLocalData(inputField.text);
-    }
-    #endregion
 
-    #region Cue & Ball
-    public void _Cue0()
+	    if (ReferenceEquals(null, codeInput))
+	    {
+		    Debug.Log("Table Hook::OnSaveButtonPushed() inputField property is not set !");
+		    return;
+	    }
+
+	    if (string.IsNullOrEmpty(codeInput.text))
+	    {
+		    return;
+	    }
+
+	    //if (!_IsPlayer(Networking.LocalPlayer)) return; //not load on others game
+
+	    LoadLocalData(codeInput.text);
+
+    }
+
+	#endregion
+
+	#region Cue & Ball
+	public void _Cue0()
     {
         outCanUseTmp = 0;
         ChangeMaterial();
@@ -506,16 +706,16 @@ public class TableHook : UdonSharpBehaviour
     }
     #endregion
 
-#region Language
-
+    #region Language
 
     public void SetLanguage(string language)
     {
-        foreach(var translate in Translations.ToArray()) ((Translations)translate.Reference).SetLanguage(language);
+        foreach(var translate in _translations.ToArray()) ((Translations)translate.Reference).SetLanguage(language);
     }
 
     public void zh() { SetLanguage("zh"); }
     public void en() { SetLanguage("en"); }
     public void ja() { SetLanguage("ja"); }
-#endregion
+
+    #endregion
 }

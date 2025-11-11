@@ -1,5 +1,3 @@
-|[中文](https://github.com/WangQAQ/VRChat-Pool-table-Leaderboard-MS-VRCSA-Billiards)| |[EN](https://github.com/WangQAQ/VRChat-Pool-table-Leaderboard-MS-VRCSA-Billiards/blob/main/README-EN.md)| |[Русский](https://github.com/WangQAQ/VRChat-Pool-table-Leaderboard-MS-VRCSA-Billiards/blob/main/README-RU.md)| |[日本語](https://github.com/WangQAQ/VRChat-Pool-table-Leaderboard-MS-VRCSA-Billiards/blob/main/README-JP.md)| |[Español](https://github.com/WangQAQ/VRChat-Pool-table-Leaderboard-MS-VRCSA-Billiards/blob/main/README-ES.md)|
-
 # VRC台球-排行榜-斯诺克
 ## 项目继承表
 * #### MS-VRCSA-Billiards
@@ -10,29 +8,30 @@
 
 > 您可以在这里游玩该桌子:[地图](https://vrchat.com/home/world/wrld_d9ac19bc-a8c4-42cd-b712-c66dd813bd8c/info)
 ---
-## 新的功能
+## 1.新的功能
 * ### 上传面板:
-	* #### 无需再向以前一样将绑定的工作放到 Start 函数,当前的绑定再 EditTime 完成,无需更多的性能消耗
-	* #### 简便的上传方式,您可以不必在意如何绑定,只需要再面板上按照顺序点击,即可完成绑定工作
+	* #### 无需再向以前一样将绑定的工作放到 Start 函数,当前的绑定在 EditTime 完成,无需更多的性能消耗
+	* #### 简便的上传方式,您可以不必在意如何绑定,只需要在面板上按照顺序点击,即可完成绑定工作
 	* #### 更好的排行榜密钥管理系统,我们注意到大家在使用自动化排行榜时,容易因为一些操作导致丢失密钥,现在我们制作了一个新的用户系统,让您可以绑定您的密钥
 * ### 用户系统:
 	* #### 您可以在[账号](https://www.wangqaq.com/PoolBar/Account)中注册您的账号
 	* #### 您现在可以在 WEB 上为自己选择彩名,只要注册了都能选喵
 	* #### 尽管现在也可以匿名上传密钥,但是为了防止大家在后续丢失密钥导致无法使用排行榜,推荐注册一个账号(里面还能累计经验)
 	* #### 您现在可以在 WEB 上选择自己的地标
-* ### 新的优化
-	* #### 我修复了曾经的 GC 问题,现在不会有向以前一样上万次的GC了
+* ### 新的优化:
+	* #### 我修复了曾经排行榜的 GC 问题,现在不会有向以前一样上万次的GC了
 	* #### 我优化了地标的 Shader,现在不会应为地标卡顿了
 	* #### 我更新了彩名的方式,现在是 WEB 创建完成完整彩名后缓存,这样就不会在UDON中有多次循环了
+  	* #### 新的面板用来绑定脚本，无需再 Start 占用游戏加载时间
 * ### 新的福利:
 	* #### 彩名现在无限制,您可以注册账号并绑定玩家,然后选择自己的彩名
-	* #### 等级系统 ( 6 级 2 段彩名,12级 3 段彩名, 24级 4段彩名 )
+	* #### 地标现在上传地图,会给大家发 3 个卡通地标喵 (自动滴没做完，大家可以在 QQ 群里面叫我,或者发个 Issues 附带注册邮箱喵)
+	* #### 等级系统 ( 12 级 2 段彩名,24级 3 段彩名, 36级 4段彩名 )(没做完,过几天应该就有了)
 * ### 新的 WEB:
 	* #### 添加了个人面板,可以给自己设置地标和彩名
 	* #### 添加了个人信息面板,查看自己上传次数和历史记录
 	* #### 添加了排行榜记录功能,现在能够帮你计算胜率
 	* #### 靠胜率做了个简易的分段,这样可以让大家不止注重分数
-	* #### 多语言在制作中...
 ---
 
 ## 2.我该如何使用它
@@ -61,10 +60,11 @@
 	* #### 里面可以看到您的赛季统计和用户等级,任务表,活动等等信息
 
 ## 更新计划
+	* #### 排行榜历史没有完全搭建完毕，完整的系统在后天完成
+	* #### 计分器小修（下个小版本）
 	* #### WebGL 台球历史回合查看
  	* #### 更好的上传链接更新
   	* #### 抽象台球小游戏
-   	* #### WEB 多语言
 
 ## 特别感谢
 
@@ -79,3 +79,4 @@
 ![qrcode_1737098291587](https://github.com/user-attachments/assets/ebbfe76c-75b4-4352-b105-5e02ae20ff09)
 > 时间紧凑，双语版的页面在做了 </br>
 > Time was tight, and the bilingual version of the page was done
+

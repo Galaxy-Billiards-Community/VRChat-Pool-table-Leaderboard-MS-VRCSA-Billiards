@@ -11,7 +11,7 @@ public class ILeaderboard : UdonSharpBehaviour
 		/* Nop */
 	}
 
-	virtual public void Refresh()
+	virtual public void _Refresh()
 	{
 		/* Nop */
 	}

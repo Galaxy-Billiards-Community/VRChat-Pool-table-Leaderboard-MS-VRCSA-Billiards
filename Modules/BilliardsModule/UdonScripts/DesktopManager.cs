@@ -552,8 +552,10 @@ public class DesktopManager : UdonSharpBehaviour
         if (!table.isPyramid) return;
 #endif
 #endif
-        
-        if (Input.GetKeyDown(KeyCode.B) )
+
+		if (table.isPyramid && table.breakFinishLocal) return;
+
+		if (Input.GetKeyDown(KeyCode.B) )
         {
             int id = nextBallOrder(!(Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift)));
             table._TriggerOtherBallHit(id, true);
@@ -632,16 +634,18 @@ public class DesktopManager : UdonSharpBehaviour
         table.cameraOverrideModule._SetTargetCamera(desktopCamera);
         table.cameraOverrideModule._SetRenderMode(CAMERA_RENDER_MODE_DESKTOP);
 
-        // table.activeCue.RequestSerialization();
+		// table.activeCue.RequestSerialization();
 
-        if (canShoot)
+		if (canShoot)
         {
             table._TriggerOnPlayerPrepareShoot();
         }
 
         cursorClampX = table.k_TABLE_WIDTH + .3f;
         cursorClampZ = table.k_TABLE_HEIGHT + .3f;
-    }
+
+		table.graphicsManager._HideMainTimer();
+	}
 
     private void exitUI()
     {
@@ -652,7 +656,10 @@ public class DesktopManager : UdonSharpBehaviour
         root.SetActive(false);
         table.cameraOverrideModule._SetRenderMode(CAMERA_RENDER_MODE_DISABLED);
         Networking.LocalPlayer.Immobilize(false);
-    }
+
+        if(table.timerLocal != 0)
+		    table.graphicsManager._ShowMainTimer();
+	}
 
     private void stopShooting()
     {

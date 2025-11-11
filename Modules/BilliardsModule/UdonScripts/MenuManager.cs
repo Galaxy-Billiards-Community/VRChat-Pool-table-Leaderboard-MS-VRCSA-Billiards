@@ -6,6 +6,9 @@
 #define EIJIS_CALLSHOT
 #define EIJIS_SEMIAUTOCALL
 #define EIJIS_10BALL
+#define EIJIS_BANKING
+#define WANGQAQ_8Ball_Flip
+#define WANGQAQ_TurnLock
 
 using System;
 using UdonSharp;
@@ -37,14 +40,21 @@ public class MenuManager : UdonSharpBehaviour
     [SerializeField] private Color buttonCallLockOnColor;
     private Color buttonCallLockOffColor;
 #endif
-    [SerializeField] private TextMeshProUGUI[] lobbyNames;
+#if WANGQAQ_TurnLock
+	[SerializeField] private GameObject buttonTurnLock;
+	[SerializeField] private Color buttonTurnLockOnColor;
+	private Color buttonTurnLockOffColor;
+#endif
+	[SerializeField] private TextMeshProUGUI[] lobbyNames;
+	[SerializeField] private TextMeshProUGUI[] lobbyScores;
 
-    [SerializeField] private TextMeshProUGUI gameModeDisplay;
+	[SerializeField] private TextMeshProUGUI gameModeDisplay;
     [SerializeField] private TextMeshProUGUI timelimitDisplay;
     [SerializeField] private TextMeshProUGUI tableDisplay;
     [SerializeField] private TextMeshProUGUI physicsDisplay;
 
-    private BilliardsModule table;
+    private BilliardsModule _table;
+    private IEloDownload _eloDownload;
 
     private uint selectedTimer;
     private uint selectedTable;
@@ -55,14 +65,15 @@ public class MenuManager : UdonSharpBehaviour
     private Vector3 joinMenuScale;
     public bool Initialized;
 
-    public void _Init(BilliardsModule table_)
+    public void _Init(BilliardsModule table , IEloDownload eloDownload)
     {
-        table = table_;
+        _table = table;
+		_eloDownload = eloDownload;
 
-        if (!Initialized)
+		if (!Initialized)
         {
             Initialized = true;
-            Transform menuJoin = table.transform.Find("intl.menu/MenuAnchor/JoinMenu");
+            Transform menuJoin = _table.transform.Find("intl.menu/MenuAnchor/JoinMenu");
             if (menuJoin)
             {
                 joinMenuPosition = menuJoin.localPosition;
@@ -70,7 +81,7 @@ public class MenuManager : UdonSharpBehaviour
                 joinMenuScale = menuJoin.localScale;
             }
 #if EIJIS_CAROM
-            selectedTable = (uint)table.tableModelLocal;
+            selectedTable = (uint)_table.tableModelLocal;
 #endif
 #if EIJIS_PUSHOUT
             buttonPushOutOffColor = buttonPushOut.GetComponent<Image>().color;
@@ -78,9 +89,12 @@ public class MenuManager : UdonSharpBehaviour
 #if EIJIS_CALLSHOT
             buttonCallLockOffColor = buttonCallLock.GetComponent<Image>().color;
 #endif
-        }
+#if WANGQAQ_TurnLock
+			buttonTurnLockOffColor = buttonTurnLock.GetComponent<Image>().color;
+#endif
+		}
 
-        _RefreshTimer();
+		_RefreshTimer();
         _RefreshPhysics();
         _RefreshTable();
         _RefreshToggleSettings();
@@ -115,41 +129,47 @@ public class MenuManager : UdonSharpBehaviour
         int numPlayersBlue = 0;
         for (int i = 0; i < 4; i++)
         {
-            if (!table.teamsLocal && i > 1)
+            if (!_table.teamsLocal && i > 1)
             {
                 lobbyNames[i].text = string.Empty;
-                continue;
+				lobbyScores[i].text = string.Empty;
+				continue;
             }
-            VRCPlayerApi player = VRCPlayerApi.GetPlayerById(table.playerIDsLocal[i]);
+            VRCPlayerApi player = VRCPlayerApi.GetPlayerById(_table.playerIDsLocal[i]);
             if (player == null)
             {
-                lobbyNames[i].text = table._translations.Get("Free slot");
-                //lobbyNames[i].text = "Free slot";
-            }
+                lobbyNames[i].text = _table._translations.Get("Free slot");
+                lobbyScores[i].text = string.Empty;
+				//lobbyNames[i].text = "Free slot";
+			}
             else
             {
-                lobbyNames[i].text = table.graphicsManager._FormatName(player);
-                numPlayers++;
+                string name = _table.graphicsManager._FormatName(player);
+
+				lobbyNames[i].text = name;  
+                lobbyScores[i].text = _eloDownload.GetEloV2(player.displayName);
+
+				numPlayers++;
                 if (i % 2 == 0)
                     numPlayersOrange++;
                 else
                     numPlayersBlue++;
             }
         }
-        table.numPlayersCurrentOrange = numPlayersOrange;
-        table.numPlayersCurrentBlue = numPlayersBlue;
-        table.numPlayersCurrent = numPlayers;
+        _table.numPlayersCurrentOrange = numPlayersOrange;
+        _table.numPlayersCurrentBlue = numPlayersBlue;
+        _table.numPlayersCurrent = numPlayers;
     }
 
     public void _RefreshTimer()
     {
-        int index = Array.IndexOf(TIMER_VALUES, (byte)table.timerLocal);
+        int index = Array.IndexOf(TIMER_VALUES, (byte)_table.timerLocal);
         selectedTimer = index == -1 ? 0 : (uint)index;
         if (index > -1)
         {
             if (TIMER_VALUES[index] == 0)
             {
-                timelimitDisplay.text = table._translations.Get("No limit");
+                timelimitDisplay.text = _table._translations.Get("No limit");
                 //timelimitDisplay.text = "No limit";
             }
             else
@@ -162,120 +182,143 @@ public class MenuManager : UdonSharpBehaviour
     public void _RefreshGameMode()
     {
         string modeName = "";
-        uint mode = (uint)table.GetProgramVariable("gameModeLocal");
-        Transform selection = table.transform.Find("intl.menu/MenuAnchor/LobbyMenu/GameMode/ModeSelection");
+        uint mode = (uint)_table.GetProgramVariable("gameModeLocal");
+        Transform selection = _table.transform.Find("intl.menu/MenuAnchor/LobbyMenu/GameMode/ModeSelection");
         Transform selectionPoint;
         switch (mode)
         {
             case 0:
-                modeName = table.isChinese8Ball ? table._translations.Get("CN 8 Ball") : table._translations.Get("EN 8 Ball");
+                modeName = _table.isChinese8Ball ? _table._translations.Get("CN 8 Ball") : _table._translations.Get("EN 8 Ball");
                 //modeName = selectedTable == 2 ? "CN 8 Ball" : "EN 8 Ball";
-                selectionPoint = table.transform.Find("intl.menu/MenuAnchor/LobbyMenu/GameMode/SelectionPoints/8ball");
-                table.setTransform(selectionPoint, selection, true);
+                selectionPoint = _table.transform.Find("intl.menu/MenuAnchor/LobbyMenu/GameMode/SelectionPoints/8ball");
+                _table.setTransform(selectionPoint, selection, true);
                 break;
             case 1:
-                modeName = table._translations.Get("9 Ball");
+                modeName = _table._translations.Get("9 Ball");
                 //modeName = "9 Ball";
-                selectionPoint = table.transform.Find("intl.menu/MenuAnchor/LobbyMenu/GameMode/SelectionPoints/9ball");
-                table.setTransform(selectionPoint, selection, true);
+                selectionPoint = _table.transform.Find("intl.menu/MenuAnchor/LobbyMenu/GameMode/SelectionPoints/9ball");
+                _table.setTransform(selectionPoint, selection, true);
                 break;
             case 2:
-                modeName = table._translations.Get("4 Ball JP");
+                modeName = _table._translations.Get("4 Ball JP");
                 //modeName = "4 Ball JP";
-                selectionPoint = table.transform.Find("intl.menu/MenuAnchor/LobbyMenu/GameMode/SelectionPoints/4ballJP");
-                table.setTransform(selectionPoint, selection, true);
+                selectionPoint = _table.transform.Find("intl.menu/MenuAnchor/LobbyMenu/GameMode/SelectionPoints/4ballJP");
+                _table.setTransform(selectionPoint, selection, true);
                 break;
             case 3:
-                modeName = table._translations.Get("4 Ball KR");
+                modeName = _table._translations.Get("4 Ball KR");
                 //modeName = "4 Ball KR";
-                selectionPoint = table.transform.Find("intl.menu/MenuAnchor/LobbyMenu/GameMode/SelectionPoints/4ballKR");
-                table.setTransform(selectionPoint, selection, true);
+                selectionPoint = _table.transform.Find("intl.menu/MenuAnchor/LobbyMenu/GameMode/SelectionPoints/4ballKR");
+                _table.setTransform(selectionPoint, selection, true);
                 break;
             case 4:
 #if EIJIS_SNOOKER15REDS
-                modeName = table._translations.Get("Snooker 15 Red");
+                modeName = _table._translations.Get("Snooker 15 Red");
                 //modeName = "Snooker 15 Red";
 #else
                 modeName = "Snooker 6 Red";
 #endif
-                selectionPoint = table.transform.Find("intl.menu/MenuAnchor/LobbyMenu/GameMode/SelectionPoints/6red");
-                table.setTransform(selectionPoint, selection, true);
+                selectionPoint = _table.transform.Find("intl.menu/MenuAnchor/LobbyMenu/GameMode/SelectionPoints/6red");
+                _table.setTransform(selectionPoint, selection, true);
                 break;
 #if EIJIS_PYRAMID
             case BilliardsModule.GAMEMODE_PYRAMID:
-                modeName = table._translations.Get("Russian Pyramid");
+                modeName = _table._translations.Get("Russian Pyramid");
                 //modeName = "Russian Pyramid";
-                selectionPoint = table.transform.Find("intl.menu/MenuAnchor/LobbyMenu/GameMode/SelectionPoints/Pyramid");
-                table.setTransform(selectionPoint, selection, true);
+                selectionPoint = _table.transform.Find("intl.menu/MenuAnchor/LobbyMenu/GameMode/SelectionPoints/Pyramid");
+                _table.setTransform(selectionPoint, selection, true);
                 break;
 #endif
 #if EIJIS_CAROM
             case BilliardsModule.GAMEMODE_3CUSHION:
-                modeName = table._translations.Get("3-Cushion");
-                selectionPoint = table.transform.Find("intl.menu/MenuAnchor/LobbyMenu/GameMode/SelectionPoints/3Cushion");
-                table.setTransform(selectionPoint, selection, true);
+                modeName = _table._translations.Get("3-Cushion");
+                selectionPoint = _table.transform.Find("intl.menu/MenuAnchor/LobbyMenu/GameMode/SelectionPoints/3Cushion");
+                _table.setTransform(selectionPoint, selection, true);
                 break;
             case BilliardsModule.GAMEMODE_2CUSHION:
-                modeName = table._translations.Get("2-Cushion");
-                selectionPoint = table.transform.Find("intl.menu/MenuAnchor/LobbyMenu/GameMode/SelectionPoints/2Cushion");
-                table.setTransform(selectionPoint, selection, true);
+                modeName = _table._translations.Get("2-Cushion");
+                selectionPoint = _table.transform.Find("intl.menu/MenuAnchor/LobbyMenu/GameMode/SelectionPoints/2Cushion");
+                _table.setTransform(selectionPoint, selection, true);
                 break;
             case BilliardsModule.GAMEMODE_1CUSHION:
-                modeName = table._translations.Get("1-Cushion");
-                selectionPoint = table.transform.Find("intl.menu/MenuAnchor/LobbyMenu/GameMode/SelectionPoints/1Cushion");
-                table.setTransform(selectionPoint, selection, true);
+                modeName = _table._translations.Get("1-Cushion");
+                selectionPoint = _table.transform.Find("intl.menu/MenuAnchor/LobbyMenu/GameMode/SelectionPoints/1Cushion");
+                _table.setTransform(selectionPoint, selection, true);
                 break;
             case BilliardsModule.GAMEMODE_0CUSHION:
-                modeName = table._translations.Get("0-Cushion");
-                selectionPoint = table.transform.Find("intl.menu/MenuAnchor/LobbyMenu/GameMode/SelectionPoints/0Cushion");
-                table.setTransform(selectionPoint, selection, true);
+                modeName = _table._translations.Get("0-Cushion");
+                selectionPoint = _table.transform.Find("intl.menu/MenuAnchor/LobbyMenu/GameMode/SelectionPoints/0Cushion");
+                _table.setTransform(selectionPoint, selection, true);
                 break;
+#endif
+#if EIJIS_BANKING
+			case BilliardsModule.GAMEMODE_BANKING:
+				modeName = _table._translations.Get("Banking");
+				selectionPoint = _table.transform.Find("intl.menu/MenuAnchor/LobbyMenu/GameMode/SelectionPoints/Banking");
+				_table.setTransform(selectionPoint, selection, true);
+				break;
 #endif
 #if EIJIS_10BALL
-            case BilliardsModule.GAMEMODE_10BALL:
-                modeName = table._translations.Get("10 Ball");
+			case BilliardsModule.GAMEMODE_10BALL:
+                modeName = _table._translations.Get("10 Ball");
                 //modeName = "10 Ball";
-                selectionPoint = table.transform.Find("intl.menu/MenuAnchor/LobbyMenu/GameMode/SelectionPoints/10ball");
-                table.setTransform(selectionPoint, selection, true);
+                selectionPoint = _table.transform.Find("intl.menu/MenuAnchor/LobbyMenu/GameMode/SelectionPoints/10ball");
+                _table.setTransform(selectionPoint, selection, true);
                 break;
 #endif
-        }
-        gameModeDisplay.text = modeName;
+#if WANGQAQ_8Ball_Flip
+			case BilliardsModule.GAMEMODE_8Ball_Flip:
+				modeName = _table._translations.Get("8 Ball Flip");
+				//modeName = "8BallFlip";
+				selectionPoint = _table.transform.Find("intl.menu/MenuAnchor/LobbyMenu/GameMode/SelectionPoints/8BallFlip");
+				_table.setTransform(selectionPoint, selection, true);
+			break;
+#endif
+		}
+		gameModeDisplay.text = modeName;
     }
     public void _RefreshPhysics()
     {
-        physicsDisplay.text = table._translations.Get((string)table.currentPhysicsManager.GetProgramVariable("PHYSICSNAME"));
+        physicsDisplay.text = _table._translations.Get((string)_table.currentPhysicsManager.GetProgramVariable("PHYSICSNAME"));
     }
 
     public void _RefreshTable()
     {
-        tableDisplay.text = table._translations.Get((string)table.tableModels[table.tableModelLocal].GetProgramVariable("TABLENAME")); // auto translate by cheese
+        tableDisplay.text = _table._translations.Get((string)_table.tableModels[_table.tableModelLocal].GetProgramVariable("TABLENAME")); // auto translate by cheese
     }
 
     public void _RefreshToggleSettings()
     {
-        TeamsToggle_button.SetIsOnWithoutNotify(table.teamsLocal);
-        GuidelineToggle_button.SetIsOnWithoutNotify(!table.noGuidelineLocal);
+        TeamsToggle_button.SetIsOnWithoutNotify(_table.teamsLocal);
+        GuidelineToggle_button.SetIsOnWithoutNotify(!_table.noGuidelineLocal);
 #if EIJIS_GUIDELINE2TOGGLE
-        Guideline2Toggle_button.gameObject.SetActive(!table.noGuidelineLocal);
-        Guideline2Toggle_button.SetIsOnWithoutNotify(!table.noGuideline2Local);
+        Guideline2Toggle_button.gameObject.SetActive(!_table.noGuidelineLocal);
+        Guideline2Toggle_button.SetIsOnWithoutNotify(!_table.noGuideline2Local);
 #endif
-        LockingToggle_button.SetIsOnWithoutNotify(!table.noLockingLocal);
+        LockingToggle_button.SetIsOnWithoutNotify(!_table.noLockingLocal);
+		EnableRankingToggle_button.SetIsOnWithoutNotify(!_table.enableRankingLocal);
 #if EIJIS_10BALL
-        Wpa10BallRuleToggle_button.SetIsOnWithoutNotify(table.wpa10BallRuleLocal);
+		Wpa10BallRuleToggle_button.SetIsOnWithoutNotify(_table.wpa10BallRuleLocal);
 #endif
 #if EIJIS_CALLSHOT
-        RequireCallShotToggle_button.SetIsOnWithoutNotify(table.requireCallShotLocal);
+        RequireCallShotToggle_button.SetIsOnWithoutNotify(_table.requireCallShotLocal);
 #if EIJIS_SEMIAUTOCALL
-        SemiAutoCallToggle_button.gameObject.SetActive(table.requireCallShotLocal);
-        SemiAutoCallToggle_button.SetIsOnWithoutNotify(table.semiAutoCallLocal);
+        SemiAutoCallToggle_button.gameObject.SetActive(_table.requireCallShotLocal);
+        SemiAutoCallToggle_button.SetIsOnWithoutNotify(_table.semiAutoCallLocal);
 #endif
 #endif
-    }
+#if WANGQAQ_TurnLock
+		if (_table.isPracticeMode)
+			_EnableTurnLockMenu();
+		else
+			_DisableTurnLockMenu();
+        _StateChangeTurnLockMenu(_table.turnLockLocal);
+#endif
+	}
 
-    public void _RefreshLobby()
+	public void _RefreshLobby()
     {
-        if (table.localPlayerDistant)
+        if (_table.localPlayerDistant)
         { _DisableOtherMenu(); }
         else { _EnableOtherMenu(); }
         _RefreshToggleSettings();
@@ -285,7 +328,7 @@ public class MenuManager : UdonSharpBehaviour
 
     public void _RefreshMenu()
     {
-        if (table.localPlayerDistant)
+        if (_table.localPlayerDistant)
         {
             _DisableLobbyMenu();
             _DisableStartMenu();
@@ -294,9 +337,9 @@ public class MenuManager : UdonSharpBehaviour
             _DisableMenuJoinLeave();
             return;
         }
-        Transform table_base = table._GetTableBase().transform;
+        Transform table_base = _table._GetTableBase().transform;
         Transform menu_Join = menuJoinLeave.transform;
-        switch (table.gameStateLocal)
+        switch (_table.gameStateLocal)
         {
             case 0://table idle
                 _DisableLobbyMenu();
@@ -306,7 +349,7 @@ public class MenuManager : UdonSharpBehaviour
                 _DisableMenuJoinLeave();
                 break;
             case 1://lobby
-                if (table.isPlayer)
+                if (_table.isPlayer)
                     _EnableLobbyMenu();
                 else
                     _DisableLobbyMenu();
@@ -324,16 +367,16 @@ public class MenuManager : UdonSharpBehaviour
                 _DisableLobbyMenu();
                 _DisableStartMenu();
                 _EnableLoadMenu();
-                if (table.isPlayer)
+                if (_table.isPlayer)
                     _EnableUndoMenu();
                 else
                     _DisableUndoMenu();
                 Transform JOINMENU_SPOT = table_base.Find(".JOINMENU");
                 if (JOINMENU_SPOT && menu_Join)
-                    table.setTransform(JOINMENU_SPOT, menu_Join.transform);
-                if (table.isBlueTeamFull && table.isOrangeTeamFull)
+                    _table.setTransform(JOINMENU_SPOT, menu_Join.transform);
+                if (_table.isBlueTeamFull && _table.isOrangeTeamFull)
                 {
-                    if (table.isPlayer)
+                    if (_table.isPlayer)
                     {
                         _EnableMenuJoinLeave();
                         _RefreshTeamJoinButtons();
@@ -358,7 +401,7 @@ public class MenuManager : UdonSharpBehaviour
                 break;
         }
         Transform leave_Button = menu_Join.Find("LeaveButton");
-        if (table.isPlayer)
+        if (_table.isPlayer)
             leave_Button.gameObject.SetActive(true);
         else
             leave_Button.gameObject.SetActive(false);
@@ -368,12 +411,12 @@ public class MenuManager : UdonSharpBehaviour
     {
         Transform join_Orange = menuJoinLeave.transform.Find("JoinOrange");
         Transform join_Blue = menuJoinLeave.transform.Find("JoinBlue");
-        if (table.isOrangeTeamFull)
+        if (_table.isOrangeTeamFull)
             join_Orange.gameObject.SetActive(false);
         else
             join_Orange.gameObject.SetActive(true);
 
-        if (table.isBlueTeamFull)
+        if (_table.isBlueTeamFull)
             join_Blue.gameObject.SetActive(false);
         else
             join_Blue.gameObject.SetActive(true);
@@ -381,114 +424,133 @@ public class MenuManager : UdonSharpBehaviour
 
     public void StartButton()
     {
-        table._TriggerLobbyOpen();
+        _table._TriggerLobbyOpen();
     }
     public void JoinOrange()
     {
-        table._TriggerJoinTeam(0);
+        _table._TriggerJoinTeam(0);
     }
     public void JoinBlue()
     {
-        table._TriggerJoinTeam(1);
+        _table._TriggerJoinTeam(1);
     }
     public void LeaveButton()
     {
-        table._TriggerLeaveLobby();
+        _table._TriggerLeaveLobby();
     }
     public void PlayButton()
     {
-        table._TriggerGameStart();
+        _table._TriggerGameStart();
     }
     public void Mode8Ball()
     {
-        table._TriggerGameModeChanged(0);
+        _table._TriggerGameModeChanged(0);
     }
     public void Mode9Ball()
     {
-        table._TriggerGameModeChanged(1);
+        _table._TriggerGameModeChanged(1);
     }
 #if EIJIS_10BALL
     public void Mode10Ball()
     {
-        table._TriggerGameModeChanged(BilliardsModule.GAMEMODE_10BALL);
+        _table._TriggerGameModeChanged(BilliardsModule.GAMEMODE_10BALL);
     }
 #endif
     public void Mode4Ball()
     {
-        table._TriggerGameModeChanged(2);
+        _table._TriggerGameModeChanged(2);
     }
     public void Mode4BallKR()
     {
-        table._TriggerGameModeChanged(3);
+        _table._TriggerGameModeChanged(3);
     }
 #if EIJIS_CAROM
     public void Mode3Cushion()
     {
-        table._TriggerGameModeChanged(BilliardsModule.GAMEMODE_3CUSHION);
+        _table._TriggerGameModeChanged(BilliardsModule.GAMEMODE_3CUSHION);
     }
     public void Mode2Cushion()
     {
-        table._TriggerGameModeChanged(BilliardsModule.GAMEMODE_2CUSHION);
+        _table._TriggerGameModeChanged(BilliardsModule.GAMEMODE_2CUSHION);
     }
     public void Mode1Cushion()
     {
-        table._TriggerGameModeChanged(BilliardsModule.GAMEMODE_1CUSHION);
+        _table._TriggerGameModeChanged(BilliardsModule.GAMEMODE_1CUSHION);
     }
     public void Mode0Cushion()
     {
-        table._TriggerGameModeChanged(BilliardsModule.GAMEMODE_0CUSHION);
+        _table._TriggerGameModeChanged(BilliardsModule.GAMEMODE_0CUSHION);
     }
 #endif
-    public void ModeSnooker6Red()
+#if EIJIS_BANKING
+	public void ModeBanking()
+	{
+		_table._TriggerGameModeChanged(BilliardsModule.GAMEMODE_BANKING);
+	}
+#endif
+	public void ModeSnooker6Red()
     {
-        table._TriggerGameModeChanged(4);
+        _table._TriggerGameModeChanged(4);
     }
 #if EIJIS_PYRAMID
     public void ModePyramid()
     {
-        table._TriggerGameModeChanged(BilliardsModule.GAMEMODE_PYRAMID);
+        _table._TriggerGameModeChanged(BilliardsModule.GAMEMODE_PYRAMID);
     }
 #endif
-    [SerializeField] private Toggle TeamsToggle_button;
+#if WANGQAQ_8Ball_Flip
+	public void Mode8BallFlip()
+	{
+		_table._TriggerGameModeChanged(BilliardsModule.GAMEMODE_8Ball_Flip);
+	}
+#endif
+	[SerializeField] private Toggle TeamsToggle_button;
     public void TeamsToggle()
     {
-        table._TriggerTeamsChanged(TeamsToggle_button.isOn);
+        _table._TriggerTeamsChanged(TeamsToggle_button.isOn);
     }
     [SerializeField] private Toggle GuidelineToggle_button;
     public void GuidelineToggle()
     {
-        table._TriggerNoGuidelineChanged(!GuidelineToggle_button.isOn);
+        _table._TriggerNoGuidelineChanged(!GuidelineToggle_button.isOn);
     }
 #if EIJIS_GUIDELINE2TOGGLE
     [SerializeField] private Toggle Guideline2Toggle_button;
     public void Guideline2Toggle()
     {
-        table._TriggerNoGuideline2Changed(!Guideline2Toggle_button.isOn);
+        _table._TriggerNoGuideline2Changed(!Guideline2Toggle_button.isOn);
     }
 #endif
     [SerializeField] private Toggle LockingToggle_button;
     public void LockingToggle()
     {
-        table._TriggerNoLockingChanged(!LockingToggle_button.isOn);
+        _table._TriggerNoLockingChanged(!LockingToggle_button.isOn);
     }
+
+	[SerializeField] private Toggle EnableRankingToggle_button;
+	public void EnableRankingToggle()
+	{
+		_table._TriggerEnableRankingChanged(!EnableRankingToggle_button.isOn);
+	}
+
 #if EIJIS_10BALL
-    [SerializeField] private Toggle Wpa10BallRuleToggle_button;
+	[SerializeField] private Toggle Wpa10BallRuleToggle_button;
     public void Wpa10BallRuleToggle()
     {
-        table._TriggerWpa10BallRuleChanged(Wpa10BallRuleToggle_button.isOn);
+        _table._TriggerWpa10BallRuleChanged(Wpa10BallRuleToggle_button.isOn);
     }
 #endif
 #if EIJIS_CALLSHOT
     [SerializeField] private Toggle RequireCallShotToggle_button;
     public void RequireCallShotToggle()
     {
-        table._TriggerRequireCallShotChanged(RequireCallShotToggle_button.isOn);
+        _table._TriggerRequireCallShotChanged(RequireCallShotToggle_button.isOn);
     }
 #if EIJIS_SEMIAUTOCALL
     [SerializeField] private Toggle SemiAutoCallToggle_button;
     public void SemiAutoCallToggle()
     {
-        table._TriggerSemiAutoCallChanged(SemiAutoCallToggle_button.isOn);
+        _table._TriggerSemiAutoCallChanged(SemiAutoCallToggle_button.isOn);
     }
 #endif
 #endif
@@ -499,7 +561,7 @@ public class MenuManager : UdonSharpBehaviour
         else
             selectedTimer = 4;
 
-        table._TriggerTimerChanged(TIMER_VALUES[selectedTimer]);
+        _table._TriggerTimerChanged(TIMER_VALUES[selectedTimer]);
     }
     public void TimeLeft()
     {
@@ -508,43 +570,43 @@ public class MenuManager : UdonSharpBehaviour
         else
             selectedTimer = 0;
 
-        table._TriggerTimerChanged(TIMER_VALUES[selectedTimer]);
+        _table._TriggerTimerChanged(TIMER_VALUES[selectedTimer]);
     }
     public void TableRight()
     {
-        if (selectedTable == table.tableModels.Length - 1)
+        if (selectedTable == _table.tableModels.Length - 1)
             selectedTable = 0;
         else
             selectedTable++;
 
-        table._TriggerTableModelChanged(selectedTable);
+        _table._TriggerTableModelChanged(selectedTable);
     }
     public void TableLeft()
     {
         if (selectedTable == 0)
-            selectedTable = (uint)table.tableModels.Length - 1;
+            selectedTable = (uint)_table.tableModels.Length - 1;
         else
             selectedTable--;
 
-        table._TriggerTableModelChanged(selectedTable);
+        _table._TriggerTableModelChanged(selectedTable);
     }
     public void PhysicsRight()
     {
-        if (selectedPhysics == table.PhysicsManagers.Length - 1)
+        if (selectedPhysics == _table.PhysicsManagers.Length - 1)
             selectedPhysics = 0;
         else
             selectedPhysics++;
 
-        table._TriggerPhysicsChanged(selectedPhysics);
+        _table._TriggerPhysicsChanged(selectedPhysics);
     }
     public void PhysicsLeft()
     {
         if (selectedPhysics == 0)
-            selectedPhysics = (uint)table.PhysicsManagers.Length - 1;
+            selectedPhysics = (uint)_table.PhysicsManagers.Length - 1;
         else
             selectedPhysics--;
 
-        table._TriggerPhysicsChanged(selectedPhysics);
+        _table._TriggerPhysicsChanged(selectedPhysics);
     }
 
     public Slider cueSmoothingSlider;
@@ -552,8 +614,8 @@ public class MenuManager : UdonSharpBehaviour
     public void setCueSmoothing()
     {
         float newSmoothing = cueSmoothingSlider.value / 10f;
-        table.cueControllers[0].setSmoothing(newSmoothing);
-        table.cueControllers[1].setSmoothing(newSmoothing);
+        _table.cueControllers[0].setSmoothing(newSmoothing);
+        _table.cueControllers[1].setSmoothing(newSmoothing);
         cueSmoothingText.text = newSmoothing.ToString("F1");
     }
 
@@ -562,9 +624,10 @@ public class MenuManager : UdonSharpBehaviour
     public void setCueSize()
     {
         float newScale = cueSizeSlider.value / 10f;
-        table.cueControllers[0].setScale(newScale);
-        table.cueControllers[1].setScale(newScale);
-        cueSizeText.text = newScale.ToString("F1");
+		float newThickness = _table.tableHook.cueThicknessValue / 10f;
+		_table.cueControllers[0].setScale(newScale, newThickness);
+		_table.cueControllers[1].setScale(newScale, newThickness);
+		cueSizeText.text = newScale.ToString("F1");
     }
 
     [NonSerialized] public UIButton inButton;
@@ -573,109 +636,115 @@ public class MenuManager : UdonSharpBehaviour
     {
         if (button.name == "StartButton")
         {
-            table._TriggerLobbyOpen();
+            _table._TriggerLobbyOpen();
         }
         else if (button.name == "JoinOrange")
         {
-            table._TriggerJoinTeam(0);
+            _table._TriggerJoinTeam(0);
         }
         else if (button.name == "JoinBlue")
         {
-            table._TriggerJoinTeam(1);
+            _table._TriggerJoinTeam(1);
         }
         else if (button.name == "LeaveButton")
         {
-            table._TriggerLeaveLobby();
+            _table._TriggerLeaveLobby();
         }
-        else if (table.localPlayerId > -1)
+        else if (_table.localPlayerId > -1)
         {
             if (button.name == "PlayButton")
             {
-                table._TriggerGameStart();
+                _table._TriggerGameStart();
             }
             else if (button.name == "8Ball")
             {
-                table._TriggerGameModeChanged(0);
+                _table._TriggerGameModeChanged(0);
             }
             else if (button.name == "9Ball")
             {
-                table._TriggerGameModeChanged(1);
+                _table._TriggerGameModeChanged(1);
             }
 #if EIJIS_10BALL
             else if (button.name == "10Ball")
             {
-                table._TriggerGameModeChanged(BilliardsModule.GAMEMODE_10BALL);
+                _table._TriggerGameModeChanged(BilliardsModule.GAMEMODE_10BALL);
             }
 #endif
             else if (button.name == "4Ball" || button.name == "4BallJP")
             {
-                table._TriggerGameModeChanged(2);
+                _table._TriggerGameModeChanged(2);
             }
             else if (button.name == "4BallKR")
             {
-                table._TriggerGameModeChanged(3);
+                _table._TriggerGameModeChanged(3);
             }
 #if EIJIS_CAROM
             else if (button.name == "3Cushion")
             {
-                table._TriggerGameModeChanged(BilliardsModule.GAMEMODE_3CUSHION);
+                _table._TriggerGameModeChanged(BilliardsModule.GAMEMODE_3CUSHION);
             }
             else if (button.name == "2Cushion")
             {
-                table._TriggerGameModeChanged(BilliardsModule.GAMEMODE_2CUSHION);
+                _table._TriggerGameModeChanged(BilliardsModule.GAMEMODE_2CUSHION);
             }
             else if (button.name == "1Cushion")
             {
-                table._TriggerGameModeChanged(BilliardsModule.GAMEMODE_1CUSHION);
+                _table._TriggerGameModeChanged(BilliardsModule.GAMEMODE_1CUSHION);
             }
             else if (button.name == "0Cushion")
             {
-                table._TriggerGameModeChanged(BilliardsModule.GAMEMODE_0CUSHION);
+                _table._TriggerGameModeChanged(BilliardsModule.GAMEMODE_0CUSHION);
             }
 #endif
             else if (button.name == "Snooker6Red")
             {
-                table._TriggerGameModeChanged(4);
+                _table._TriggerGameModeChanged(4);
             }
 #if EIJIS_PYRAMID
             else if (button.name == "Pyramid")
             {
-                table._TriggerGameModeChanged(BilliardsModule.GAMEMODE_PYRAMID);
+                _table._TriggerGameModeChanged(BilliardsModule.GAMEMODE_PYRAMID);
             }
 #endif
-            else if (button.name == "TeamsToggle")
+#if WANGQAQ_8Ball_Flip
+			else if (button.name == "8BallFlip")
+			{
+				_table._TriggerGameModeChanged(BilliardsModule.GAMEMODE_8Ball_Flip);
+			}
+#endif
+			else if (button.name == "TeamsToggle")
             {
-                table._TriggerTeamsChanged(button.toggleState);
+                _table._TriggerTeamsChanged(button.toggleState);
             }
             else if (button.name == "GuidelineToggle")
             {
-                table._TriggerNoGuidelineChanged(!button.toggleState);
+                _table._TriggerNoGuidelineChanged(!button.toggleState);
             }
 #if EIJIS_GUIDELINE2TOGGLE
             else if (button.name == "Guideline2Toggle")
             {
-                table._TriggerNoGuideline2Changed(!button.toggleState);
+                _table._TriggerNoGuideline2Changed(!button.toggleState);
             }
 #endif
             else if (button.name == "LockingToggle")
             {
-                table._TriggerNoLockingChanged(!button.toggleState);
+                _table._TriggerNoLockingChanged(!button.toggleState);
             }
 #if EIJIS_10BALL
             else if (button.name == "Wpa10BallRuleToggle")
             {
-                table._TriggerWpa10BallRuleChanged(button.toggleState);
+                _table._TriggerWpa10BallRuleChanged(button.toggleState);
             }
 #endif
 #if EIJIS_CALLSHOT
             else if (button.name == "RequireCallShotToggle")
             {
-                table._TriggerRequireCallShotChanged(button.toggleState);
+                _table._TriggerRequireCallShotChanged(button.toggleState);
             }
 #if EIJIS_SEMIAUTOCALL
             else if (button.name == "SemiAutoCallToggle")
             {
-                table._TriggerSemiAutoCallChanged(button.toggleState);
+                _table._TriggerSemiAutoCallChanged(button.toggleState);
             }
 #endif
 #endif
@@ -685,7 +754,7 @@ public class MenuManager : UdonSharpBehaviour
                 {
                     selectedTimer--;
 
-                    table._TriggerTimerChanged(TIMER_VALUES[selectedTimer]);
+                    _table._TriggerTimerChanged(TIMER_VALUES[selectedTimer]);
                 }
             }
             else if (button.name == "TimeLeft")
@@ -694,30 +763,30 @@ public class MenuManager : UdonSharpBehaviour
                 {
                     selectedTimer++;
 
-                    table._TriggerTimerChanged(TIMER_VALUES[selectedTimer]);
+                    _table._TriggerTimerChanged(TIMER_VALUES[selectedTimer]);
                 }
             }
             else if (button.name == "TableRight")
             {
-                if (selectedTable == table.tableModels.Length - 1) { return; }
+                if (selectedTable == _table.tableModels.Length - 1) { return; }
                 selectedTable++;
 
-                table._TriggerTableModelChanged(selectedTable);
+                _table._TriggerTableModelChanged(selectedTable);
             }
             else if (button.name == "TableLeft")
             {
                 if (selectedTable == 0) { return; }
                 selectedTable--;
 
-                table._TriggerTableModelChanged(selectedTable);
+                _table._TriggerTableModelChanged(selectedTable);
             }
             else if (button.name == "PhysicsRight")
             {
-                if (selectedPhysics == table.PhysicsManagers.Length - 1) { return; }
+                if (selectedPhysics == _table.PhysicsManagers.Length - 1) { return; }
                 {
                     selectedPhysics++;
 
-                    table._TriggerPhysicsChanged(selectedPhysics);
+                    _table._TriggerPhysicsChanged(selectedPhysics);
                 }
             }
             else if (button.name == "PhysicsLeft")
@@ -726,7 +795,7 @@ public class MenuManager : UdonSharpBehaviour
                 {
                     selectedPhysics--;
 
-                    table._TriggerPhysicsChanged(selectedPhysics);
+                    _table._TriggerPhysicsChanged(selectedPhysics);
                 }
             }
         }
@@ -735,16 +804,16 @@ public class MenuManager : UdonSharpBehaviour
     private void joinTeam(int id)
     {
         // Create new lobby
-        if (!table.lobbyOpen)
+        if (!_table.lobbyOpen)
         {
-            table._TriggerLobbyOpen();
+            _table._TriggerLobbyOpen();
         }
 
-        table._LogInfo("joining table on team " + id);
+        _table._LogInfo("joining table on team " + id);
 
-        if (table.localPlayerId == -1)
+        if (_table.localPlayerId == -1)
         {
-            table._TriggerJoinTeam(id);
+            _table._TriggerJoinTeam(id);
         }
     }
 
@@ -859,5 +928,21 @@ public class MenuManager : UdonSharpBehaviour
     {
         buttonCallLock.GetComponent<Image>().color = state ? buttonCallLockOnColor : buttonCallLockOffColor;
     }
+#endif
+#if WANGQAQ_TurnLock
+	public void _EnableTurnLockMenu()
+	{
+		buttonTurnLock.SetActive(true);
+	}
+
+	public void _DisableTurnLockMenu()
+	{
+		buttonTurnLock.SetActive(false);
+	}
+
+	public void _StateChangeTurnLockMenu(bool state)
+	{
+		buttonTurnLock.GetComponent<Image>().color = state ? buttonTurnLockOnColor : buttonTurnLockOffColor;
+	}
 #endif
 }

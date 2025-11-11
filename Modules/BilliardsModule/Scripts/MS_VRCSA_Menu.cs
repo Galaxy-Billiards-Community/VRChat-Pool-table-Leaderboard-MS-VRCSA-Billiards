@@ -6,8 +6,8 @@ using UnityEditor;
 
 public class MS_VRCSA_Menu : MonoBehaviour
 {
-    [MenuItem("MS-VRCSA/Set Up Pool Table Layers\\Collision", false, 0)]
-    private static void setPoolTableCollisionLayers()
+    /* [MenuItem("MS-VRCSA/Set Up Pool Table Layers\\Collision", false, 0)] */
+    public static void setPoolTableCollisionLayers()
     {
         for (int i = 0; i < 32; i++)
         {

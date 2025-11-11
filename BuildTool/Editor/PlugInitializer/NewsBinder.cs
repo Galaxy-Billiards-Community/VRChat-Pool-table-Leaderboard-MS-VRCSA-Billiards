@@ -8,7 +8,7 @@ namespace WangQAQ.PoolBuild
 {
 	public class NewsBinder : IPlugInitializer
 	{
-		public bool Init() 
+		public bool Init(string worldGuid, string worldKey) 
 		{
 			var _newsDownload = Component.FindObjectsOfType<GetNewsList>();
 			var _newsGetContext = Component.FindFirstObjectByType<GetMainContext>();

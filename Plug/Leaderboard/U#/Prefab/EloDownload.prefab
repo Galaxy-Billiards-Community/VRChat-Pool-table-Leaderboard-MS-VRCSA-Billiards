@@ -60,7 +60,7 @@ MonoBehaviour:
   _eloDataList:
     _values: []
   url:
-    url: https://wangqaq.com/AspAPI/table/GetScore/V2
+    url: https://wangqaq.com/AspAPI/table/GetScore/V3
   _leaderboards: []
   ReloadSecond: 60
 --- !u!114 &7447381489881292750

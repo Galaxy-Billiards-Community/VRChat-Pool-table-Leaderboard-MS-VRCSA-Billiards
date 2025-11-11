@@ -14,7 +14,7 @@ Material:
   m_ValidKeywords: []
   m_InvalidKeywords: []
   m_LightmapFlags: 4
-  m_EnableInstancingVariants: 1
+  m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
   m_CustomRenderQueue: -1
   stringTagMap: {}
@@ -33,18 +33,21 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
+    - _DarknessIntensity: 0.212
     - _EdgeSharpness: 2
     - _Floor: 0.832
     - _Glossiness: 0.697
     - _HeightScale: 0.5
     - _Metallic: 0.033
     - _NoiseScale: 0.5
-    - _Scale: 1
+    - _Scale: 0.875
     - _ShadowBlur: 0.2
-    - _ShadowFade: 0.09
+    - _ShadowCut: 0.076
+    - _ShadowFade: 0.22
     - _ShadowOffset: 0.83
     - _ShadowRadius: 0.5
+    - _ShadowSoftness: 2.99
     m_Colors:
     - _Color: {r: 0, g: 0, b: 0, a: 0}
-    - _ShadowColor: {r: 0, g: 0, b: 0, a: 0.3137255}
+    - _ShadowColor: {r: 0.03773582, g: 0.03773582, b: 0.03773582, a: 0.21568628}
   m_BuildTextureStacks: []

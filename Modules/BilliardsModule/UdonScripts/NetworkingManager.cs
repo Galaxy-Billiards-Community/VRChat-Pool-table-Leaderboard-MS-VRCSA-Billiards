@@ -9,11 +9,16 @@
 #define EIJIS_CALLSHOT
 #define EIJIS_SEMIAUTOCALL
 #define EIJIS_10BALL
+#define EIJIS_BANKING
+
+#define WangQAQ_PathSystem
 
 using System;
 using UdonSharp;
+using Unity.Mathematics;
 using UnityEngine;
 using VRC.SDKBase;
+using VRC.Udon.Common;
 
 [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
 public class NetworkingManager : UdonSharpBehaviour
@@ -83,11 +88,11 @@ public class NetworkingManager : UdonSharpBehaviour
     // the current turn state (0 is shooting, 1 is simulating, 2 is ran out of time (auto transition to 0), 3 is selecting 4 ball mode)
     [UdonSynced][NonSerialized] public byte turnStateSynced;
 
-    // the current gamemode (0 is 8ball, 1 is 9ball, 2 is jp4b, 3 is kr4b, 4 is Snooker6Red)
-#if EIJIS_PYRAMID || EIJIS_CAROM
-    // additional games 4 is Snooker15Red, 5 is RussianPyramid, 6-9 is 3-Cushion(2,1,0-Cushion)
+	// the current gamemode (0 is 8ball, 1 is 9ball, 2 is jp4b, 3 is kr4b, 4 is Snooker6Red)
+#if EIJIS_PYRAMID || EIJIS_CAROM || EIJIS_10BALL || EIJIS_BANKING
+	// additional games 4 is Snooker15Red, 5 is RussianPyramid, 6-9 is 3-Cushion(2,1,0-Cushion), 10 is 10ball, 11 is Banking , 12 is 8Ball Flip
 #endif
-    [UdonSynced][NonSerialized] public byte gameModeSynced;
+	[UdonSynced][NonSerialized] public byte gameModeSynced;
 
     // the timer for the current game in seconds
     [UdonSynced][NonSerialized] public byte timerSynced;
@@ -110,8 +115,11 @@ public class NetworkingManager : UdonSharpBehaviour
     // whether or not the cue can be locked
     [UdonSynced][NonSerialized] public bool noLockingSynced;
 
+	// use or not use Ranking
+	[UdonSynced][NonSerialized] public bool enableRankingSynced;
+
 #if EIJIS_10BALL
-    [UdonSynced][NonSerialized] public bool wpa10BallRuleSynced;
+	[UdonSynced][NonSerialized] public bool wpa10BallRuleSynced;
 #endif
 #if EIJIS_CALLSHOT
     [UdonSynced] [NonSerialized] public bool requireCallShotSynced;
@@ -138,9 +146,19 @@ public class NetworkingManager : UdonSharpBehaviour
 #endif
 #if EIJIS_CALLSHOT
     [UdonSynced] [NonSerialized] public bool callShotLockSynced;
-    
+
 #endif
-    [SerializeField] private PlayerSlot playerSlot;
+
+#if WangQAQ_PathSystem
+	// PathSystem 0 is no Shout in Un(Re)do 1 is has Shout in Un(Re)do
+	[UdonSynced][NonSerialized] public bool isShout;
+
+#endif
+
+    /* Last Sync Time (UnixTime) */
+    [UdonSynced][NonSerialized] public long lastTime;
+
+	[SerializeField] private PlayerSlot playerSlot;
     private BilliardsModule table;
 
     private bool hasBufferedMessages = false;
@@ -218,7 +236,7 @@ public class NetworkingManager : UdonSharpBehaviour
         }
     }
 
-    /*public override void OnDeserialization()
+	/*public override void OnDeserialization()
     {
         if (table == null)
         {
@@ -236,7 +254,7 @@ public class NetworkingManager : UdonSharpBehaviour
         processRemoteState();
     }*/
 
-    [NonSerialized] public bool delayedDeserialization = false;
+	[NonSerialized] public bool delayedDeserialization = false;
     public override void OnDeserialization()
     {
         delayedDeserialization = false;
@@ -441,7 +459,10 @@ public class NetworkingManager : UdonSharpBehaviour
 
     public void _OnHitBall(Vector3 cueBallV, Vector3 cueBallW)
     {
-        stateIdSynced++;
+        Debug.Log($"HIT V : {cueBallV.x}|{cueBallV.y}|{cueBallV.z}");
+		Debug.Log($"HIT W : {cueBallW.x}|{cueBallW.y}|{cueBallW.z}");
+
+		stateIdSynced++;
 
         turnStateSynced = 1;
         cueBallVSynced = cueBallV;
@@ -495,7 +516,7 @@ public class NetworkingManager : UdonSharpBehaviour
         bufferMessages(false);
     }
 
-    public void _OnGameStart(uint defaultBallsPocketed, Vector3[] ballPositions)
+	public void _OnGameStart(uint defaultBallsPocketed, Vector3[] ballPositions)
     {
         stateIdSynced++;
 
@@ -529,7 +550,10 @@ public class NetworkingManager : UdonSharpBehaviour
         turnStateSynced = 0;
         isTableOpenSynced = true;
         teamIdSynced = 0;
-        fourBallCueBallSynced = 0;
+#if EIJIS_ISSUE_FIX
+		teamColorSynced = 0;
+#endif
+		fourBallCueBallSynced = 0;
         cueBallVSynced = Vector3.zero;
         cueBallWSynced = Vector3.zero;
         timerStartSynced = Networking.GetServerTimeInMilliseconds();
@@ -572,7 +596,7 @@ public class NetworkingManager : UdonSharpBehaviour
         pushOutStateSynced = table.PUSHOUT_BEFORE_BREAK;
 #endif
 
-        bufferMessages(false);
+		bufferMessages(false);
     }
 
     public int _OnJoinTeam(int teamId)
@@ -606,7 +630,7 @@ public class NetworkingManager : UdonSharpBehaviour
         return -1;
     }
 
-    public void _OnLeaveLobby(int playerId)
+	public void _OnLeaveLobby(int playerId)
     {
         playerSlot.LeaveSlot(playerId);
     }
@@ -741,8 +765,15 @@ public class NetworkingManager : UdonSharpBehaviour
         bufferMessages(false);
     }
 
+	public void _OnEnableRankingChanged(bool enableRanking)
+	{
+		enableRankingSynced = enableRanking;
+
+		bufferMessages(false);
+	}
+
 #if EIJIS_10BALL
-    public void _OnWpa10BallRuleChanged(bool wpa10BallRuleEnabled)
+	public void _OnWpa10BallRuleChanged(bool wpa10BallRuleEnabled)
     {
         wpa10BallRuleSynced = wpa10BallRuleEnabled;
 
@@ -905,23 +936,32 @@ public class NetworkingManager : UdonSharpBehaviour
         bufferMessages(false);
     }
 
-    private void swapFourBallCueBalls()
-    {
+	private void swapFourBallCueBalls()
+	{
 #if EIJIS_CAROM
+#if EIJIS_BANKING
+		if (gameModeSynced != 2 && gameModeSynced != 3 &&
+			gameModeSynced != BilliardsModule.GAMEMODE_0CUSHION &&
+			gameModeSynced != BilliardsModule.GAMEMODE_1CUSHION &&
+			gameModeSynced != BilliardsModule.GAMEMODE_2CUSHION &&
+			gameModeSynced != BilliardsModule.GAMEMODE_3CUSHION &&
+			gameModeSynced != BilliardsModule.GAMEMODE_BANKING) return;
+#else
         if (gameModeSynced != 2 && gameModeSynced != 3 && 
-            gameModeSynced != 6 && gameModeSynced != 7 && gameModeSynced != 8 && gameModeSynced != 9) return;
+                gameModeSynced != 6 && gameModeSynced != 7 && gameModeSynced != 8 && gameModeSynced != 9) return;
+#endif
 #else
         if (gameModeSynced != 2 && gameModeSynced != 3) return;
 #endif
 
-        fourBallCueBallSynced ^= 0x01;
+		fourBallCueBallSynced ^= 0x01;
 
-        Vector3 temp = ballsPSynced[0];
-        ballsPSynced[0] = ballsPSynced[13];
-        ballsPSynced[13] = temp;
-    }
+		Vector3 temp = ballsPSynced[0];
+		ballsPSynced[0] = ballsPSynced[13];
+		ballsPSynced[13] = temp;
+	}
 
-    private void bufferMessages(bool urgent)
+	private void bufferMessages(bool urgent)
     {
         isUrgentSynced = (byte)(urgent ? 2 : 0);
 
@@ -943,7 +983,10 @@ public class NetworkingManager : UdonSharpBehaviour
 #else
         Networking.SetOwner(Networking.LocalPlayer, this.gameObject);
 #endif
-        this.RequestSerialization();
+		/* set last Sync Time */
+		lastTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+
+		this.RequestSerialization();
         OnDeserialization();
     }
 

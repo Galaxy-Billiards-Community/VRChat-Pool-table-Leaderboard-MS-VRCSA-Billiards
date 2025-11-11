@@ -1,17 +1,11 @@
 ﻿
-using System.Text;
-using System;
-using TMPro;
 using UdonSharp;
 using UnityEngine;
-using UnityEngine.InputSystem;
 using VRC.SDK3.Data;
 using VRC.SDK3.StringLoading;
 using VRC.SDKBase;
 using VRC.Udon;
 using VRC.Udon.Common.Interfaces;
-using WangQAQ.ED;
-using System.Linq;
 
 namespace WangQAQ.UdonPlug
 {
@@ -47,7 +41,7 @@ namespace WangQAQ.UdonPlug
 		}
 
 		//字符串下载失败回调
-		public override void OnStringLoadError(IVRCStringDownload result)
+		public override void OnStringLoadError	(IVRCStringDownload result)
 		{
 			isLoading = false;
 			SendCustomEventDelayedSeconds("_AutoReload", 60);

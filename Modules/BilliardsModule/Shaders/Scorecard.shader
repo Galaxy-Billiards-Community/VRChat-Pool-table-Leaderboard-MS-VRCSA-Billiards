@@ -122,6 +122,9 @@
                }
             }
 
+            if(base.a < 0.7)
+                clip(-1);
+
             fixed4 leftComponent = BLACK;
             float leftStart = i.uv.x - OFFSET;
             if (leftStart < leftEnd)

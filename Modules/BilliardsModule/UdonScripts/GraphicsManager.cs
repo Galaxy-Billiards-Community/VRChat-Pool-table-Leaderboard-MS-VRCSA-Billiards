@@ -7,8 +7,10 @@
 #define EIJIS_CALLSHOT
 #define EIJIS_SEMIAUTOCALL
 #define EIJIS_10BALL
-
+#define EIJIS_BANKING
 #define WANGQAQ_SkinnedMeshBall
+#define WANGQAQ_8Ball_Flip
+#define WANGQAQ_ISSUE_FIX
 
 // #define EIJIS_DEBUG_PIRAMIDSCORE
 
@@ -49,6 +51,10 @@ public class GraphicsManager : UdonSharpBehaviour
 	[SerializeField] Material calledPocketSphereGray;
 #endif
 
+	[Header("Trajectory")]
+	[SerializeField] TrailRenderer[] cueTrajectory;
+	[SerializeField] TrailRenderer[] otherTrajectory;
+
 	[Header("Text")]
 	[SerializeField] TextMeshProUGUI[] playerNames;
 
@@ -66,14 +72,13 @@ public class GraphicsManager : UdonSharpBehaviour
 	[SerializeField] Color[] usColorArr;
 
 	[SerializeField] GameObject[] timers;
-
-	/* 4ÇòMesh */
+	/* 4çƒMesh */
 	private Mesh[] meshOverrideFourBall = new Mesh[4];
 #if EIJIS_PYRAMID
-	/* ¶íÂŞË¹Mesh */
+	/* ä¿„ç½—æ–¯Mesh */
 	private Mesh[] meshOverridePyramidBall = new Mesh[BilliardsModule.PYRAMID_BALLS];
 
-	/* Ô­Mesh(ÓÃÀ´´òÍê¶íÂŞË¹ºóÖØÖÃ) */
+	/* åŸMesh(ç”¨æ¥æ‰“å®Œä¿„ç½—æ–¯åé‡ç½®) */
 	private Mesh[] meshOverrideRegular = new Mesh[BilliardsModule.PYRAMID_BALLS];
 #else
     private Mesh[] meshOverrideRegular = new Mesh[4];
@@ -130,18 +135,18 @@ public class GraphicsManager : UdonSharpBehaviour
 		winnerText_go = winnerText.gameObject;
 
 #if WANGQAQ_SkinnedMeshBall
-		// ´¦ÀíÇòÌå
+		// å¤„ç†çƒä½“
 		Material[] materials = table.BaseBall.materials;
 		ballMaterial = materials[0];
 		ballMaterial.name = ballMaterial.name + " for " + table_.gameObject.name;
 
 		Material[] newMaterials = new Material[] { ballMaterial };
 
-		/* ÉèÖÃÌùÍ¼¶ÔÏó */
+		/* è®¾ç½®è´´å›¾å¯¹è±¡ */
 		table.BaseBall.materials = newMaterials;
 		table.RED15Ball.materials = newMaterials;
 
-		// ´¦ÀíÒõÓ°
+		// å¤„ç†é˜´å½±
 		Material[] shadowMaterials = table.Shadows[0].materials;
 		shadowMaterial = shadowMaterials[0];
 		shadowMaterial.name = shadowMaterial.name + " for " + table_.gameObject.name;
@@ -226,6 +231,7 @@ public class GraphicsManager : UdonSharpBehaviour
 		tickIntroAnimation();
 		tickTableColor();
 		tickWinner();
+		tickTrajectory();
 	}
 
 	private void tickBallPositions()
@@ -336,7 +342,6 @@ public class GraphicsManager : UdonSharpBehaviour
 
 	private void tickIntroAnimation()
 	{
-
 		if (introAnimationTime <= 0.0f) return;
 
 		introAnimationTime -= Time.deltaTime;
@@ -400,6 +405,21 @@ public class GraphicsManager : UdonSharpBehaviour
 
 		winnerText_go.transform.localPosition = new Vector3(0.0f, Mathf.Sin(Time.timeSinceLevelLoad) * 0.1f, 0.0f);
 		winnerText_go.transform.Rotate(Vector3.up, 90.0f * Time.deltaTime);
+	}
+
+	private void tickTrajectory()
+	{
+		if (table.tableHook != null)
+		{
+			foreach(var a in cueTrajectory)
+			{
+				a.enabled = table.tableHook.CueTrajectory;
+			}
+			foreach(var a in otherTrajectory)
+			{
+				a.enabled = table.tableHook.OtherTrajectory;
+			}
+		}
 	}
 
 	public void _SetScorecardPlayers(int[] players)
@@ -742,12 +762,23 @@ int uniform_cue_colour;
 	{
 		if (!table.timerRunning || table.localPlayerDistant) return;
 		timers[0].SetActive(true);
+		if (table.desktopManager._IsInUI()) return;
+		timers[1].SetActive(true);
+	}
+	
+	public void _HideMainTimer()
+	{
+		timers[1].SetActive(false);
+	}
+
+	public void _ShowMainTimer()
+	{
 		timers[1].SetActive(true);
 	}
 
 	public void _RefreshTimers()
 	{
-		if (!table.timerRunning || table.localPlayerDistant || !table.gameLive)
+		if (!table.timerRunning || table.localPlayerDistant || !table.gameLive || table.desktopManager._IsInUI())
 		{
 			_HideTimers();
 			return;
@@ -764,7 +795,15 @@ int uniform_cue_colour;
 		}
 	}
 
-	/* ÇĞ»»BallÏÔÊ¾ */
+	public void _RotatingFlipBall()
+	{
+		for (int i = 0; i < 16; i++)
+		{
+			table.balls[i].transform.rotation = new Quaternion(0f, 0f, 0.707f, 0.707f);
+		}
+	}
+
+	/* åˆ‡æ¢Ballæ˜¾ç¤º */
 	public void _ShowBalls()
 	{
 
@@ -805,11 +844,16 @@ int uniform_cue_colour;
 
 			setBallActive(table.balls[0], true);
 			setBallActive(table.balls[13], true);
+#if EIJIS_BANKING
+			setBallActive(table.balls[14], !table.isBanking);
+			setBallActive(table.balls[15], !table.is3Cusion && !table.is2Cusion && !table.is1Cusion && !table.is0Cusion && !table.isBanking);
+#else
 			setBallActive(table.balls[14], true);
 #if EIJIS_CAROM
 			setBallActive(table.balls[15], !table.is3Cusion && !table.is2Cusion && !table.is1Cusion && !table.is0Cusion);
 #else
             table.balls[15].SetActive(true);
+#endif
 #endif
 		}
 #if EIJIS_SNOOKER15REDS
@@ -820,8 +864,8 @@ int uniform_cue_colour;
 		{
 #if EIJIS_SNOOKER15REDS
 			/* 
-			 * ¿ªÆô 0-16  25-31  
-			 * ¹Ø±Õ 16-25 31-32
+			 * å¼€å¯ 0-16  25-31  
+			 * å…³é—­ 16-25 31-32
 			 */
 			for (int i = 0; i < 16; i++)
 				setBallActive(table.balls[i], true);
@@ -841,9 +885,9 @@ int uniform_cue_colour;
 		else
 		{
 			/*
-			* ÕâÀïÊÇ8Çò
- `			* ¿ªÆô 00-16
-			* ¹Ø±Õ 16-32
+			* è¿™é‡Œæ˜¯8çƒ
+ `			* å¼€å¯ 00-16
+			* å…³é—­ 16-32
 			*/
 			for (int i = 0; i < 16; i++)
 			{
@@ -856,7 +900,7 @@ int uniform_cue_colour;
 		}
 	}
 
-	/* ÉèÖÃÇò×´Ì¬ */
+	/* è®¾ç½®çƒçŠ¶æ€ */
 	private void setBallActive(GameObject gameObject, bool isActive)
 	{
 #if WANGQAQ_SkinnedMeshBall
@@ -895,9 +939,26 @@ int uniform_cue_colour;
 		scorecard_gameobject.SetActive(true);
 #if EIJIS_PYRAMID
 #if EIJIS_CAROM
+#if WANGQAQ_8Ball_Flip
+		uint cardGameMode = table.gameModeLocal; // é»˜è®¤å€¼
+
+		if (table.is3Cusion || table.is1Cusion || table.is2Cusion || table.is0Cusion)
+		{
+			cardGameMode = 2;
+		}
+
+		if (table.isPyramid)
+		{
+			cardGameMode = 0;
+		}
+
+		scorecard.SetInt("_GameMode", (int)cardGameMode);
+#else
+
 		scorecard.SetInt("_GameMode", (int)(table.isPyramid ? 0 :
 			(table.is3Cusion || table.is1Cusion || table.is2Cusion || table.is0Cusion ? 2 : table.gameModeLocal)
 			));
+#endif
 #else
         scorecard.SetInt("_GameMode", (int)(table.isPyramid ? 0 : table.gameModeLocal));
 #endif
@@ -934,7 +995,7 @@ int uniform_cue_colour;
 		_UpdateTeamColor(0);
 #endif
 
-		/* 4ÇòÌæ»»Mesh */
+		/* 4çƒæ›¿æ¢Mesh */
 		if (table.is4Ball)
 		{
 #if !WANGQAQ_SkinnedMeshBall
@@ -961,7 +1022,7 @@ int uniform_cue_colour;
 				table.RED15Ball.enabled = false;
 			}
 #else
-			/* ¶íÂŞË¹Mesh */
+			/* ä¿„ç½—æ–¯Mesh */
 #if EIJIS_PYRAMID
 			if (table.isPyramid)
 			{
@@ -986,10 +1047,13 @@ int uniform_cue_colour;
 #endif
 		}
 
+		// ç¿»çƒæ¨¡å¼åˆå§‹è®¾ç½®æ—‹è½¬
+		if (table.is8BallFlip)
+			_RotatingFlipBall();
 		_ShowBalls();
 	}
 
-	/* ´Ë´¦ÉèÖÃÌ¨ÇòÑÕÉ«ºÍ×À×ÓÑÕÉ«£¨Ë¹Åµ¿Ë£¬9/10ÇòÇĞ»»£¬12ÇòË¹Åµ¿Ë£© */
+	/* æ­¤å¤„è®¾ç½®å°çƒé¢œè‰²å’Œæ¡Œå­é¢œè‰²ï¼ˆæ–¯è¯ºå…‹ï¼Œ9/10çƒåˆ‡æ¢ï¼Œ12çƒæ–¯è¯ºå…‹ï¼‰ */
 	public void _UpdateTableColorScheme()
 	{
 #if EIJIS_10BALL
@@ -1174,6 +1238,10 @@ int uniform_cue_colour;
 					snookerInstruction.gameObject.SetActive(false);
 				}
 				_UpdateScorecard();
+#if WANGQAQ_ISSUE_FIX
+				// Fix 4Ball fill
+				table.auto_pocketblockers.SetActive(table.is4Ball);
+#endif
 			}
 		}
 		_RefreshTimers();
@@ -1330,9 +1398,9 @@ int uniform_cue_colour;
 	{
 		if (!table.is4Ball) return;
 
-		/* ËÄÇò»÷ÇòºóÇĞ»»²ÄÖÊºÍÄ¸ÇòÎ»ÖÃ */
+		/* å››çƒå‡»çƒååˆ‡æ¢æè´¨å’Œæ¯çƒä½ç½® */
 #if WANGQAQ_SkinnedMeshBall
-		/* ÃÉÆ¤×ÅÉ«Æ÷ÉèÖÃĞÎÌ¬¶¯»­ÇĞ»» */
+		/* è’™çš®ç€è‰²å™¨è®¾ç½®å½¢æ€åŠ¨ç”»åˆ‡æ¢ */
 		if (fourBallCueBall == 0)
 		{
 			Debug.Log("4ball:A");

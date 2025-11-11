@@ -8,9 +8,9 @@ namespace WangQAQ.PoolBuild
 {
 	public class ColorBinder : IPlugInitializer
 	{
-		public bool Init()
+		public bool Init(string worldGuid,string worldKey)
 		{
-			/* ³õÊ¼»¯¼Æ·ÖÆ÷ */
+			/* åˆå§‹åŒ–è®¡åˆ†å™¨ */
 			var ColorManager = Component.FindObjectsOfType<ColorManager>();
 			var ColorDownload = Component.FindFirstObjectByType<ColorDownloaderV2>();
 
@@ -21,7 +21,7 @@ namespace WangQAQ.PoolBuild
 			{
 				scoreManager._colorDownloaderV2 = ColorDownload;
 
-				// ÏÔÊ½µØ¼ÇÂ¼±ä¸ü
+				// æ˜¾å¼åœ°è®°å½•å˜æ›´
 				PrefabUtility.RecordPrefabInstancePropertyModifications(scoreManager);
 			}
 

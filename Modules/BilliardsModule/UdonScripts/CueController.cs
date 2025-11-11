@@ -1,4 +1,5 @@
 ﻿#define EIJIS_ISSUE_FIX
+#define CHEESE_ISSUE_FIX
 
 using System;
 using UdonSharp;
@@ -34,9 +35,11 @@ public class CueController : UdonSharpBehaviour
     [UdonSynced] private bool secondaryLocked;
     [UdonSynced] private Vector3 secondaryLockPos;
 
-    private float cueScaleMine = 1;
-    [UdonSynced] private float cueScale = 1;
-    private float cueSmoothingLocal = 1;
+	private float cueScaleMine = 1;
+	private float cueThicknessMine = 1;
+	[UdonSynced] private float cueScale = 1;
+	[UdonSynced] private float cueThinkness = 1;
+	private float cueSmoothingLocal = 1;
     private float cueSmoothing = 30;
 
     private Vector3 secondaryOffset;
@@ -120,11 +123,10 @@ public class CueController : UdonSharpBehaviour
 
     private void refreshCueScale()
     {
-        //body.transform.localScale = new Vector3(1, 1, cueScale);
+		//body.transform.localScale = new Vector3(1, 1, cueScale);
 
-        float factor = Mathf.Clamp(cueScale, 0.5f, 1.5f) - 0.5f;
-        body.transform.localScale = new Vector3(Mathf.Lerp(0.7f,1.3f,factor), Mathf.Lerp(0.7f, 1.3f, factor), cueScale);
-    }
+		body.transform.localScale = new Vector3(cueThinkness, cueThinkness, cueScale);
+	}
 
     private void refreshCueSmoothing()
     {
@@ -190,6 +192,7 @@ public class CueController : UdonSharpBehaviour
         desktop.transform.position = body.transform.position;
         desktop.transform.rotation = body.transform.rotation;
     }
+
     private void FixedUpdate()
     {
         if (primaryHolding)
@@ -341,7 +344,8 @@ public class CueController : UdonSharpBehaviour
 
         //syncedCueSkin = table.activeCueSkin;
         cueScale = cueScaleMine;
-        RequestSerialization();
+		cueThinkness = cueThicknessMine;
+		RequestSerialization();
         OnDeserialization();
 
         refreshCueSmoothing();
@@ -468,25 +472,38 @@ public class CueController : UdonSharpBehaviour
         refreshCueSmoothing();
     }
 
-    public void setScale(float scale)
-    {
-        cueScaleMine = scale;
-        if (!Networking.IsOwner(gameObject)) return;
-        cueScale = cueScaleMine;
-        RequestSerialization();
-        OnDeserialization();
-    }
+	public void setScale(float scale, float thickness)
+	{
+		cueScaleMine = scale;
+		cueThicknessMine = thickness;
+		if (!Networking.IsOwner(gameObject)) return;
+		cueScale = cueScaleMine;
+		cueThinkness = cueThicknessMine;
+		RequestSerialization();
+		OnDeserialization();
+	}
 
-    public void resetScale()
-    {
-        if (!Networking.IsOwner(gameObject)) return;
-        if (cueScale == 1) return;
-        cueScale = 1;
-        RequestSerialization();
-        OnDeserialization();
-    }
+	public void resetScale()
+	{
+#if CHEESE_ISSUE_FIX
+        if (!Networking.IsOwner(gameObject))    //cheese try to fix issue
+        {
+            if(!ReferenceEquals(null,authorizedOwners) && 2 <= authorizedOwners.Length && (Networking.LocalPlayer.playerId == authorizedOwners[0] || Networking.LocalPlayer.playerId == authorizedOwners[1]))
+                Networking.SetOwner(Networking.LocalPlayer,gameObject);
+            else
+                return; 
+        }
+#else
+		if (!Networking.IsOwner(gameObject)) return;
+#endif
+		if (cueScale == 1 && cueThinkness == 1) return;
+		cueScale = 1;
+		cueThinkness = 1;
+		RequestSerialization();
+		OnDeserialization();
+	}
 
-    private void clampControllers()
+	private void clampControllers()
     {
         clampTransform(primary.transform);
         clampTransform(secondary.transform);
@@ -494,8 +511,8 @@ public class CueController : UdonSharpBehaviour
 
     private void clampTransform(Transform child)
     {
-        child.position = table.transform.TransformPoint(clamp(table.transform.InverseTransformPoint(child.position), -4.25f, 4.25f, 0f, 4f, -3.5f, 3.5f));
-    }
+        child.position = table.transform.TransformPoint(clamp(table.transform.InverseTransformPoint(child.position), -4.25f, 4.25f, 0f, 4f, -3.25f, 3.25f));
+	}
 
     public GameObject _GetDesktopMarker()
     {

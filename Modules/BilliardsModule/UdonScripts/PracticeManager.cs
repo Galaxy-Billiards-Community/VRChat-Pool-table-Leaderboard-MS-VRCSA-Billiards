@@ -1,42 +1,50 @@
 ﻿#define EIJIS_SNOOKER15REDS
 
 using System;
+using System.Diagnostics;
 using UdonSharp;
 
 [UdonBehaviourSyncMode(BehaviourSyncMode.None)]
 public class PracticeManager : UdonSharpBehaviour
 {
-    private BilliardsModule table;
+	private BilliardsModule table;
 
-    private object[] history = new object[128];
+	/*    数据       当前选择回合     栈顶指针 */
+	/* 0 | 1 | 2 .... currentPtr ... latestPtr */
 
-    private int currentPtr;
-    private int latestPtr;
+	private object[] history = new object[128];
 
-    /* private bool hack_currentlyLoading;
+	/* 当前状态 */
+	private int currentPtr;
+	/* 栈顶 */
+	private int latestPtr;
+
+	/* private bool hack_currentlyLoading;
     private bool hack_dontRecordNext; */
 
-    public void _Init(BilliardsModule table_)
-    {
-        table = table_;
+	public void _Init(BilliardsModule table_)
+	{
+		table = table_;
 
-        _Clear();
-    }
+		_Clear();
+	}
+	
+	/*
+	public void _Tick()
+	{
+	}
+	*/
 
-    public void _Tick()
-    {
-    }
+	public void _Clear()
+	{
+		Array.Clear(history, 0, history.Length);
+		currentPtr = 0;
+		latestPtr = 0;
+	}
 
-    public void _Clear()
-    {
-        Array.Clear(history, 0, history.Length);
-        currentPtr = 0;
-        latestPtr = 0;
-    }
-
-    public void _Record()
-    {
-        /*if (hack_currentlyLoading) return;
+	public void _Record()
+	{
+		/*if (hack_currentlyLoading) return;
         
         if (hack_dontRecordNext)
         {
@@ -45,181 +53,198 @@ public class PracticeManager : UdonSharpBehaviour
             return;
         }*/
 
-        int stateIdLocal = table.networkingManager.stateIdSynced;
+		int stateIdLocal = table.networkingManager.stateIdSynced;
 
-        if (stateIdLocal == currentPtr) return; // already seen
+		if (stateIdLocal == currentPtr) return; // already seen
 
-        if (stateIdLocal < 0 || stateIdLocal >= 1024) return; // abuse?
+		if (stateIdLocal < 0 || stateIdLocal >= 1024) return; // abuse?
 
-        // set current pointer to whatever we're recording
-        currentPtr = stateIdLocal;
+		// set current pointer to whatever we're recording
+		currentPtr = stateIdLocal;
 
-        // expand if needed
-        if (currentPtr >= history.Length)
-        {
-            int newSize = history.Length * 2;
-            if (newSize < currentPtr) newSize = currentPtr;
+		// expand if needed
+		if (currentPtr >= history.Length)
+		{
+			int newSize = history.Length * 2;
+			if (newSize < currentPtr) newSize = currentPtr;
 
-            object[] newHistory = new object[newSize];
-            Array.Copy(history, newHistory, history.Length);
-            history = newHistory;
-        }
+			object[] newHistory = new object[newSize];
+			Array.Copy(history, newHistory, history.Length);
+			history = newHistory;
+		}
 
-        object oldValue = history[currentPtr];
-        object newValue = table._SerializeInMemoryState();
+		object oldValue = history[currentPtr];
+		object newValue = table._SerializeInMemoryState();
 
-        history[currentPtr] = newValue;
+		history[currentPtr] = newValue;
 
-        // set latest pointer to current pointer if we're diverging from history
-        if (oldValue != null && !table._AreInMemoryStatesEqual((object[])oldValue, (object[])newValue))
-        {
-            latestPtr = currentPtr;
-        }
-        // otherwise, set it only if we're seeing something new
-        else if (stateIdLocal > latestPtr)
-        {
-            latestPtr = stateIdLocal;
-        }
+		// set latest pointer to current pointer if we're diverging from history
+		if (oldValue != null && !table._AreInMemoryStatesEqual((object[])oldValue, (object[])newValue))
+		{
+			latestPtr = currentPtr;
+		}
+		// otherwise, set it only if we're seeing something new
+		else if (stateIdLocal > latestPtr)
+		{
+			latestPtr = stateIdLocal;
+		}
 
-        table._LogInfo($"recording state current={currentPtr} latest={latestPtr}");
-    }
+		table._LogInfo($"recording state current={currentPtr} latest={latestPtr}");
+	}
 
-    public void _Undo()
-    {
-        if (!table.isPlayer) { return; }
-        int newPtr = pop(false);
-        if (newPtr == -1)
-        {
-            table._IndicateError();
-            return;
-        }
+	public void _Undo()
+	{
+		if (!table.isPlayer) { return; }
+		int newPtr = pop(false, out bool isShout);
+		if (newPtr == -1)
+		{
+			table._IndicateError();
+			return;
+		}
 
-        load(newPtr);
-    }
+		table.networkingManager.isShout = isShout || table.networkingManager.turnStateSynced == 1;
 
-    public void _SnookerUndo()
-    {
+		load(newPtr);
+	}
+
+	public void _SnookerUndo()
+	{
 #if EIJIS_SNOOKER15REDS
-        if (!table.isSnooker) { return; }
+		if (!table.isSnooker) { return; }
 #else
         if (!table.isSnooker6Red) { return; }
 #endif
-        if (table.foulStateLocal == 0 || table.fourBallCueBallLocal == 0) { return; }
-        if (!table.isMyTurn()) { return; }
+		if (table.foulStateLocal == 0 || table.fourBallCueBallLocal == 0) { return; }
+		if (!table.isMyTurn()) { return; }
 
-        int newPtr = pop(true);
-        if (newPtr == -1)
-        {
-            table._IndicateError();
-            return;
-        }
+		int newPtr = pop(true, out bool isShout);
+		if (newPtr == -1)
+		{
+			table._IndicateError();
+			return;
+		}
 
-        load_SnookerUndo(currentPtr - newPtr);
-    }
+		table.networkingManager.isShout = isShout || table.networkingManager.turnStateSynced == 1;
 
-    public void _Redo()
-    {
-        if (!table.isPlayer) { return; }
-        int newPtr = push();
-        if (newPtr == -1)
-        {
-            table._IndicateError();
-            return;
-        }
+		load_SnookerUndo(currentPtr - newPtr);
+	}
 
-        load(newPtr);
-    }
+	public void _Redo()
+	{
+		if (!table.isPlayer) { return; }
+		int newPtr = push();
+		if (newPtr == -1)
+		{
+			table._IndicateError();
+			return;
+		}
 
-    private int push()
-    {
-        int newPtr = currentPtr;
+		load(newPtr);
+	}
 
-        while (newPtr < latestPtr)
-        {
-            newPtr++;
+	private int push()
+	{
+		int newPtr = currentPtr;
 
-            if (history[newPtr] == null) continue;
+		while (newPtr < latestPtr)
+		{
+			newPtr++;
 
-            return newPtr;
-        }
+			if (history[newPtr] == null) continue;
 
-        return -1;
-    }
+			return newPtr;
+		}
 
-    private int pop(bool snookerUndo)
-    {
-        int newPtr = currentPtr;
+		return -1;
+	}
 
-        while (newPtr > 0)
-        {
-            /*if (currentPtr <= 1)
+	/// <summary>
+	/// 
+	/// </summary>
+	/// <param name="snookerUndo"></param>
+	/// <param name="isShout"></param>
+	/// <returns></returns>
+	private int pop(bool snookerUndo, out bool isShout)
+	{
+		int newPtr = currentPtr;
+		isShout = false;
+
+		while (newPtr > 0)
+		{
+			/*if (currentPtr <= 1)
             {
                 table._IndicateError();
                 return false;
             }*/
-            newPtr--;
+			newPtr--;
 
-            if (history[newPtr] == null) continue;
-            object[] state = (object[])history[newPtr];
-            if (snookerUndo)
-            {
-                // repositioining the ball counts as a step, so we need to go back to the last step when it wasn't our turn
-                if ((byte)state[4] == (byte)table.localTeamId)
-                {
-                    continue;
-                }
-            }
-            if ((byte)state[9] == 0 || (byte)state[9] == 2)
-            {
-                return newPtr;
-            }
-        }
+			if (history[newPtr] == null) continue;
+			object[] state = (object[])history[newPtr];
+			if (snookerUndo)
+			{
+				// repositioining the ball counts as a step, so we need to go back to the last step when it wasn't our turn
+				if ((byte)state[4] == (byte)table.localTeamId)
+				{
+					continue;
+				}
+			}
 
-        return -1;
-    }
+			if ((byte)state[9] == 1)
+			{
+				isShout = true;
+			}
 
-    private void load_SnookerUndo(int amountBack)
-    {
-        if (table.isLocalSimulationRunning)
-        {
-            table._LogInfo("interrupting simulation and loading new state");
-        }
+			if ((byte)state[9] == 0 || (byte)state[9] == 2)
+			{
+				return newPtr;
+			}
+		}
 
-        object[] state = (object[])history[currentPtr - amountBack];
-        object[] curState = (object[])history[currentPtr];
-        //set the values we don't want to reset
-        state[2] = curState[2];//scores
-        state[5] = (uint)6;//foulstate
-        state[6] = false;//tableisopen
-        state[8] = curState[8];//fourBallCueBall
+		return -1;
+	}
 
-        // (Vector3[])state[0], (uint)state[1], (int[])state[2], (uint)state[3], (uint)state[4], (uint)state[5], (bool)state[6], (uint)state[7], (uint)state[8],
-        // (byte)state[9], (Vector3)state[10], (Vector3)state[11], (byte)state[12], (bool)state[13]
-        //==
-        // Vector3[] newBallsP, uint ballsPocketed, int[] newScores, uint gameMode, uint teamId, uint foulState, bool isTableOpen, uint teamColor, uint fourBallCueBall,
-        // byte turnStateLocal, Vector3 cueBallV, Vector3 cueBallW, byte previewWinningTeam, bool colorTurn
+	private void load_SnookerUndo(int amountBack)
+	{
+		if (table.isLocalSimulationRunning)
+		{
+			table._LogInfo("interrupting simulation and loading new state");
+		}
 
-        // hack_dontRecordNext = (byte) state[9] == 1;
-        // hack_currentlyLoading = true;
-        table._LoadInMemoryState(state, currentPtr + 1);
-        // hack_currentlyLoading = false;
+		object[] state = (object[])history[currentPtr - amountBack];
+		object[] curState = (object[])history[currentPtr];
+		//set the values we don't want to reset
+		state[2] = curState[2];//scores
+		state[5] = (uint)6;//foulstate
+		state[6] = false;//tableisopen
+		state[8] = curState[8];//fourBallCueBall
 
-        table._IndicateSuccess();
-    }
+		// (Vector3[])state[0], (uint)state[1], (int[])state[2], (uint)state[3], (uint)state[4], (uint)state[5], (bool)state[6], (uint)state[7], (uint)state[8],
+		// (byte)state[9], (Vector3)state[10], (Vector3)state[11], (byte)state[12], (bool)state[13]
+		//==
+		// Vector3[] newBallsP, uint ballsPocketed, int[] newScores, uint gameMode, uint teamId, uint foulState, bool isTableOpen, uint teamColor, uint fourBallCueBall,
+		// byte turnStateLocal, Vector3 cueBallV, Vector3 cueBallW, byte previewWinningTeam, bool colorTurn
 
-    private void load(int newPtr)
-    {
-        if (table.isLocalSimulationRunning)
-        {
-            table._LogInfo("interrupting simulation and loading new state");
-        }
+		// hack_dontRecordNext = (byte) state[9] == 1;
+		// hack_currentlyLoading = true;
+		table._LoadInMemoryState(state, currentPtr + 1);
+		// hack_currentlyLoading = false;
 
-        object[] state = (object[])history[newPtr];
-        // hack_dontRecordNext = (byte) state[9] == 1;
-        // hack_currentlyLoading = true;
-        table._LoadInMemoryState(state, newPtr);
-        // hack_currentlyLoading = false;
+		table._IndicateSuccess();
+	}
 
-        table._IndicateSuccess();
-    }
+	private void load(int newPtr)
+	{
+		if (table.isLocalSimulationRunning)
+		{
+			table._LogInfo("interrupting simulation and loading new state");
+		}
+
+		object[] state = (object[])history[newPtr];
+		// hack_dontRecordNext = (byte) state[9] == 1;
+		// hack_currentlyLoading = true;
+		table._LoadInMemoryState(state, newPtr);
+		// hack_currentlyLoading = false;
+
+		table._IndicateSuccess();
+	}
 }

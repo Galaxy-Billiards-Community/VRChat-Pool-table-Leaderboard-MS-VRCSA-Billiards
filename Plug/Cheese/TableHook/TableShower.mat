@@ -24,10 +24,6 @@ Material:
   m_SavedProperties:
     serializedVersion: 3
     m_TexEnvs:
-    - _DetailCloth:
-        m_Texture: {fileID: 2800000, guid: 5595b1562bd4dfb468d2e74e52907bee, type: 3}
-        m_Scale: {x: -306.06, y: 255}
-        m_Offset: {x: 0, y: 0}
     - _MainTex:
         m_Texture: {fileID: 2800000, guid: 0f29fb54b18431741943088713852c34, type: 3}
         m_Scale: {x: 0.5, y: 0.2}
@@ -35,7 +31,6 @@ Material:
     m_Ints: []
     m_Floats:
     - _ClothHue: 0
-    - _ClothSaturation: 1.4355316
-    m_Colors:
-    - _Color: {r: 1, g: 1, b: 1, a: 1}
+    - _ClothSaturation: 1
+    m_Colors: []
   m_BuildTextureStacks: []
