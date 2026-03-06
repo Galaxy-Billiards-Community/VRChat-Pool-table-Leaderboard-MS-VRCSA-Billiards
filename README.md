@@ -30,3 +30,5 @@
 
 # 联系渠道
 如何需要任何帮助可以加入我们的QQ群： `1025822002`
+
+<img width="2124" height="1186" alt="e8d81e58-f199-43ff-b61b-d3dfde13e2d7" src="https://github.com/user-attachments/assets/d9c3dc45-c7c6-4e79-8278-f35174231fc6" />
